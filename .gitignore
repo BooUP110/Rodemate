@@ -1,0 +1,61 @@
+# Local development history, raw verification evidence and downloaded tooling.
+# Keep these locally; the public docs/ directory contains the reviewable guides.
+/development/
+/.tools/
+/.dist/
+
+# Gradle, Kotlin and Android generated files.
+.gradle/
+.gradle-user-home/
+.kotlin/
+**/build/
+.externalNativeBuild/
+.cxx/
+local.properties
+captures/
+*.apk
+*.aab
+*.apks
+*.aar
+*.dex
+*.class
+*.hprof
+*.heapdump
+*.log
+
+# Machine-specific editor settings and agent/account configuration.
+.idea/
+.vscode/
+.fleet/
+*.iml
+/.codex/
+/.agents/
+/.aws/
+
+# Signing material and environment-specific credentials.
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+keystore.properties
+signing.properties
+secrets.properties
+credentials.json
+service-account*.json
+google-services.json
+.env
+.env.*
+!.env.example
+
+# Python/tool caches and operating-system metadata.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Intentionally keep gradle/wrapper/gradle-wrapper.jar and test *.bin fixtures.
+# Do not ignore all JAR, BIN, JSON or image files.

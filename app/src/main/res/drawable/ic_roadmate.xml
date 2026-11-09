@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Original replaceable Roadmate icon: two companions over a shared road. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#205E50" android:pathData="M0,0H108V108H0Z" />
+    <path android:fillColor="#DCEEE4" android:pathData="M30,28C30,18 45,18 45,28C45,38 30,38 30,28M63,28C63,18 78,18 78,28C78,38 63,38 63,28" />
+    <path android:fillColor="#B9D9C6" android:pathData="M29,47C29,39 38,34 45,39L54,46L63,39C70,34 79,39 79,47L79,68C79,80 66,87 54,87C42,87 29,80 29,68Z" />
+    <path android:fillColor="#183D36" android:pathData="M42,52A3,3 0,1 0,42 58A3,3 0,1 0,42 52M66,52A3,3 0,1 0,66 58A3,3 0,1 0,66 52" />
+    <path android:fillColor="#FFFEFA" android:pathData="M49,87L52,68H56L59,87Z" />
+</vector>
