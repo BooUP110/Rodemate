@@ -36,7 +36,7 @@ private enum class PassPage(val label: String) {
 @Composable
 internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame, parkedStatus: String,
     modifier: Modifier = Modifier, openAlbum: () -> Unit, openMemory: () -> Unit, openHome: () -> Unit,
-    priorityCare: @Composable () -> Unit) {
+    tryOnHome: (CompanionPreview) -> Unit, priorityCare: @Composable () -> Unit) {
     val progress by viewModel.progressUiState.collectAsStateWithLifecycle()
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
     val data by game.state.collectAsStateWithLifecycle()
@@ -111,7 +111,7 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
                             PassPage.LOBBY -> SeasonGallery(summary, data, wide) { show(PassPage.DETAIL, it) }
                             PassPage.DETAIL -> PassJourney(viewModel, game, data, pass, summary, owned, wide,
                                 openAlbum, { show(PassPage.DRAW) }, { show(PassPage.TRIAL) }, { show(PassPage.LIBRARY) }, openHome)
-                            PassPage.TRIAL -> CompanionTrial(pass, viewModel, wide) { show(PassPage.DETAIL) }
+                            PassPage.TRIAL -> CompanionTrial(pass, viewModel, wide, tryOnHome) { show(PassPage.DETAIL) }
                             PassPage.STAMPS -> {
                                 val canChoose = game.canChoose(data, stamps) && season != null
                                 WorldTitle("여행 여권", Color.White)
@@ -357,7 +357,8 @@ private fun StampBoard(world: JourneyWorld, stamps: Set<JourneyStamp>, line: Boo
 }
 
 @Composable
-private fun ColumnScope.CompanionTrial(pass: JourneyPass, viewModel: RoadmateViewModel, wide: Boolean, openPass: () -> Unit) {
+private fun ColumnScope.CompanionTrial(pass: JourneyPass, viewModel: RoadmateViewModel, wide: Boolean,
+    tryOnHome: (CompanionPreview) -> Unit, openPass: () -> Unit) {
     val world = pass.world
     val choices = viewModel.companionPreviews.filter { it.profile.id in pass.companionIds() }
     var preview by remember(pass) { mutableStateOf(choices.firstOrNull()) }
@@ -385,6 +386,7 @@ private fun ColumnScope.CompanionTrial(pass: JourneyPass, viewModel: RoadmateVie
             WorldAction("공조 제안 체험", world, { showCare = true; viewModel.journeyAction { careChecked() } })
             WorldAction("패스 상세 보기", world, openPass, primary = false)
         }
+        preview?.let { selected -> WorldAction("동행 홈에서 체험", world, { tryOnHome(selected) }) }
     }
 }
 

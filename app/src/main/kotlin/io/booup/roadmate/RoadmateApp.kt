@@ -37,6 +37,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
     val previews = viewModel.companionPreviews
     val activePreview = previews.firstOrNull { it.profile.id == care.companion.id }
     var page by remember { mutableStateOf(RoadmatePage.HOME) }
+    var homeTrial by remember { mutableStateOf<CompanionPreview?>(null) }
     var returnToMap by remember { mutableStateOf(false) }
     var mapPlace by remember { mutableStateOf<JourneyPlace?>(null) }
     var albumPlace by remember { mutableStateOf<JourneyPlace?>(null) }
@@ -48,6 +49,9 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
     LaunchedEffect(canBrowse) {
         if (!canBrowse) { page = RoadmatePage.HOME; focus.clearFocus(force = true); keyboard?.hide() }
         else viewModel.restoreJourneyCompanion()
+    }
+    LaunchedEffect(page, canBrowse) {
+        if (page != RoadmatePage.HOME || !canBrowse) homeTrial = null
     }
     LaunchedEffect(journey.running, canBrowse, returnToMap) {
         if (returnToMap && !journey.running && canBrowse) {
@@ -63,6 +67,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
                     modifier = Modifier.fillMaxSize().padding(insets),
                     openAlbum = { albumPlace = null; page = RoadmatePage.COLLECTION },
                     openMemory = { page = RoadmatePage.MEMORY }, openHome = { page = RoadmatePage.HOME },
+                    tryOnHome = { homeTrial = it; page = RoadmatePage.HOME },
                     priorityCare = {
                         CareContent(care, { viewModel.respond(it) }, { id, revision -> viewModel.displayed(id, revision) },
                             { viewModel.selectCompanion(it) }, showCompanionPicker = false)
@@ -144,13 +149,16 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
                                         OutlinedButton(onClick = { page = RoadmatePage.SEASON }, modifier = Modifier.heightIn(min = 52.dp)) { Text("시즌 보상") }
                                     }
                                 }
-                                HomeContent(context, trip, care, post, canBrowse, simulationLabel != null,
+                                val trial = homeTrial.takeIf { canBrowse }
+                                HomeContent(context, trip, trial?.profile ?: care.companion, post, canBrowse, simulationLabel != null,
                                 openMemory = {
                                     trip.runtime.completed?.let { record -> viewModel.postDriveAction { it.open(record.tripId) } }
                                     page = RoadmatePage.MEMORY
                                 }, openSettings = { page = RoadmatePage.SETTINGS }, readWarnings = viewModel::readParkedWarnings,
                                 previews = if (gameState == null) previews else previews.filter { it.profile.id in gameState.companions },
-                                activePreview = activePreview, selectCompanion = { id ->
+                                activePreview = trial ?: activePreview,
+                                endTrial = if (trial == null) null else { { homeTrial = null } }, selectCompanion = { id ->
+                                    homeTrial = null
                                     if (gameState == null) viewModel.selectCompanion(id)
                                     else if (id in gameState.companions) viewModel.equipJourneyCompanion(id)
                                     else viewModel.equipDefaultCompanion(id)
@@ -165,10 +173,10 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
 }
 
 @Composable
-private fun HomeContent(context: VehicleContext, trip: TripUiState, care: CareUiState, post: PostDriveUiState,
+private fun HomeContent(context: VehicleContext, trip: TripUiState, companionProfile: CompanionProfile, post: PostDriveUiState,
     canBrowse: Boolean, demo: Boolean, openMemory: () -> Unit, openSettings: () -> Unit,
     readWarnings: suspend () -> AdapterResult<List<String>>, previews: List<CompanionPreview>,
-    activePreview: CompanionPreview?, selectCompanion: (CompanionId) -> Unit) {
+    activePreview: CompanionPreview?, endTrial: (() -> Unit)?, selectCompanion: (CompanionId) -> Unit) {
     BoxWithConstraints {
         val wide = maxWidth >= 960.dp
         val companion: @Composable () -> Unit = {
@@ -178,19 +186,22 @@ private fun HomeContent(context: VehicleContext, trip: TripUiState, care: CareUi
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         (previews.map { it.profile } + CompanionProfiles.all).forEach { profile ->
-                            FilterChip(selected = care.companion.id == profile.id,
+                            FilterChip(selected = companionProfile.id == profile.id,
                                 onClick = { selectCompanion(profile.id) }, label = { Text(profile.displayName) },
                                 modifier = Modifier.heightIn(min = 56.dp))
                         }
                     }
                 }
-                if (activePreview == null) CompanionPortrait(care.companion.displayName, care.companion.tone == CompanionTone.WARM,
+                if (activePreview == null) CompanionPortrait(companionProfile.displayName, companionProfile.tone == CompanionTone.WARM,
                     Modifier.fillMaxWidth().heightIn(max = 260.dp))
                 else CompanionPreviewPortrait(activePreview, Modifier.fillMaxWidth().height(224.dp))
-                Text(care.companion.displayName, style = MaterialTheme.typography.titleLarge)
+                Text(companionProfile.displayName, style = MaterialTheme.typography.titleLarge)
                 Text("함께 달리고, 잠시 쉬고,\n오늘의 드라이브를 기억해요.", style = MaterialTheme.typography.bodyLarge)
                 Text(if (activePreview == null) "오리지널 동반자 · 임시 디자인" else "가상 콜라보 · 내부 시연",
                     style = MaterialTheme.typography.labelMedium)
+                if (endTrial != null) OutlinedButton(onClick = endTrial, modifier = Modifier.heightIn(min = 56.dp)) {
+                    Text("체험 끝내기")
+                }
             }
         }
         val status: @Composable () -> Unit = {

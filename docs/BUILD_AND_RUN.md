@@ -91,6 +91,8 @@ Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형�
 3. **시즌 패스**에서 일러스트 포스터를 눌러 해당 패스에 들어간다. 화면 아래 여행 리본의 레벨 표식을 누르면 무료·프리미엄 보상이 열린다. **패스권 뽑기**에서 무료 시연권으로 미보유 패스를 뽑고 봉투를 연다. 강릉과 제주 엽서를 모으면 두 번째 시연권이 열린다.
 4. 네 시연 지역의 첫 방문을 기록하면 시연 설정 기준 최대 레벨에 도달한다. 보유한 프리미엄 패스에서 **Lv.5 표식 → 동반자 팩 열기 → 받기 → 로드메이트로 지정**을 누른다. 다시 방문 시연을 하면 **내 패스함**에 동반자의 첫 동행 엽서가 생긴다.
 
+내부 시연판에서는 **동반자 체험 → 캐릭터 선택 → 동행 홈에서 체험**으로 정차 중 홈에 캐릭터를 잠시 적용할 수 있다. **체험 끝내기**를 누르거나 홈을 벗어나면 기존 동반자로 돌아간다.
+
 시연 경로는 합성 트립에 연결된다. Production의 위치 응답과 실제 경로 격자는 별도 검증 단계다.
 
 지도는 [geoBoundaries KOR ADM2, 2020](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM2/)의 [고정 버전 단순화 경계](https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/KOR/ADM2/geoBoundaries-KOR-ADM2_simplified.geojson)를 사용한다. 원저자는 geoBoundaries와 citypopulation.de이며 라이선스는 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)이다. 앱의 `journey/korea-districts.json`은 원본 파일의 228개 피처에서 식별자와 링 좌표를 추출해 화면용으로 투영하고 반올림한 파생 자료다. 엽서 배경은 생성한 여행 일러스트다.
