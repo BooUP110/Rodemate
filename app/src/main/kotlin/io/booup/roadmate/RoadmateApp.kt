@@ -194,11 +194,14 @@ private fun HomeContent(context: VehicleContext, trip: TripUiState, companionPro
                 }
                 if (activePreview == null) CompanionPortrait(companionProfile.displayName, companionProfile.tone == CompanionTone.WARM,
                     Modifier.fillMaxWidth().heightIn(max = 260.dp))
-                else CompanionPreviewPortrait(activePreview, Modifier.fillMaxWidth().height(224.dp))
+                else CompanionPreviewPortrait(activePreview, Modifier.fillMaxWidth().height(224.dp), roam = canBrowse)
                 Text(companionProfile.displayName, style = MaterialTheme.typography.titleLarge)
                 Text("함께 달리고, 잠시 쉬고,\n오늘의 드라이브를 기억해요.", style = MaterialTheme.typography.bodyLarge)
                 Text(if (activePreview == null) "오리지널 동반자 · 임시 디자인" else "가상 콜라보 · 내부 시연",
                     style = MaterialTheme.typography.labelMedium)
+                if (canBrowse && activePreview?.idleAtlas != null) {
+                    Text("캐릭터를 누르면 인사해요.", style = MaterialTheme.typography.labelMedium)
+                }
                 if (endTrial != null) OutlinedButton(onClick = endTrial, modifier = Modifier.heightIn(min = 56.dp)) {
                     Text("체험 끝내기")
                 }

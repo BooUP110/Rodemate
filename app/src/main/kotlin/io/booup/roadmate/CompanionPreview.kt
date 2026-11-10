@@ -1,32 +1,48 @@
 package io.booup.roadmate
 
 import android.graphics.BitmapFactory
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import io.booup.roadmate.model.CompanionProfile
 import io.booup.roadmate.model.CompanionTone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 data class CompanionPreview(val profile: CompanionProfile, val portrait: String, val seasonTitle: String,
     val idleAtlas: String? = null)
@@ -47,11 +63,14 @@ internal fun artwork(path: String?): ImageBitmap? {
 }
 
 @Composable
-fun CompanionPreviewPortrait(preview: CompanionPreview, modifier: Modifier = Modifier, animate: Boolean = true) = key(preview.profile.id) {
+fun CompanionPreviewPortrait(preview: CompanionPreview, modifier: Modifier = Modifier, animate: Boolean = true,
+    roam: Boolean = false) = key(preview.profile.id) {
     val atlas = artwork(if (animate || preview.portrait == preview.idleAtlas) preview.idleAtlas else null)
     val still = artwork(if (atlas == null) preview.portrait else null)
     val description = "${preview.profile.displayName} · 콜라보 초상화"
-    if (atlas != null) {
+    if (atlas != null && animate && roam) {
+        RoamingCompanionPortrait(atlas, description, modifier)
+    } else if (atlas != null) {
         var frame by remember(atlas) { mutableIntStateOf(0) }
         LaunchedEffect(atlas, animate) {
             frame = 0
@@ -64,6 +83,65 @@ fun CompanionPreviewPortrait(preview: CompanionPreview, modifier: Modifier = Mod
         AtlasFrame(atlas, frame, modifier.semantics { contentDescription = description })
     } else if (still != null) Image(still, contentDescription = description, modifier = modifier)
     else CompanionPortrait(preview.profile.displayName, preview.profile.tone == CompanionTone.WARM, modifier)
+}
+
+@Composable
+private fun RoamingCompanionPortrait(atlas: ImageBitmap, description: String, modifier: Modifier) {
+    val position = remember { Animatable(0f) }
+    var bounce by remember { mutableFloatStateOf(0f) }
+    var tilt by remember { mutableFloatStateOf(0f) }
+    var frame by remember { mutableIntStateOf(0) }
+    var greetings by remember { mutableIntStateOf(0) }
+    LaunchedEffect(greetings) {
+        suspend fun wave() {
+            for (next in listOf(1, 2, 3, 0)) {
+                frame = next
+                delay(if (next == 2) 220 else 150)
+            }
+        }
+
+        bounce = 0f
+        tilt = 0f
+        frame = 0
+        if (greetings > 0) wave()
+        delay(950)
+        while (true) {
+            for (target in listOf(.85f, -.85f, 0f)) {
+                val start = position.value
+                val distance = abs(target - start)
+                if (distance > .03f) {
+                    val steps = if (distance > 1f) 4 else 2
+                    position.animateTo(target, tween(steps * 310)) {
+                        val phase = (value - start) / (target - start) * steps * PI
+                        bounce = abs(sin(phase)).toFloat()
+                        tilt = (sin(phase) * 3f).toFloat()
+                        frame = if (bounce > .6f) 1 else 0
+                    }
+                }
+                bounce = 0f
+                tilt = 0f
+                wave()
+                delay(450)
+            }
+        }
+    }
+    BoxWithConstraints(modifier
+        .semantics { contentDescription = description }
+        .clickable(role = Role.Button, onClickLabel = "인사하기") { greetings++ }, contentAlignment = Alignment.Center) {
+        val sprite = minOf(maxWidth, maxHeight * .84f)
+        val stride = ((maxWidth - sprite) / 2).coerceAtMost(72.dp)
+        Canvas(Modifier.matchParentSize()) {
+            val width = sprite.toPx() * (.48f - bounce * .06f)
+            val height = sprite.toPx() * .06f
+            drawOval(Color(0x263F6551), Offset(center.x + position.value * stride.toPx() - width / 2,
+                center.y + sprite.toPx() * .37f), Size(width, height))
+        }
+        AtlasFrame(atlas, frame, Modifier.size(sprite).graphicsLayer {
+            translationX = position.value * stride.toPx()
+            translationY = -bounce * 10.dp.toPx()
+            rotationZ = tilt
+        })
+    }
 }
 
 @Composable
