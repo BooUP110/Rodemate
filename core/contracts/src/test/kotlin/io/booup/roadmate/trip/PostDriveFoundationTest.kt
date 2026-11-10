@@ -1,5 +1,6 @@
 package io.booup.roadmate.trip
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import io.booup.roadmate.care.*
 import io.booup.roadmate.model.*
 import io.booup.roadmate.postdrive.*
@@ -63,7 +64,7 @@ class PostDriveFoundationTest {
         motion = observed(motion, elapsed), restrictions = observed(DrivingRestrictions(ux, 0, false), elapsed)).context(elapsed)
     private fun region(tripId: String = "trip") = RegionEvidence(tripId, RegionId("test-region"), "Confirmed test region", RegionEvidenceSource.DEMO, 150, true)
     private suspend fun setup(dir: File = temporary.newFolder(), provider: RegionEvidenceProvider = RegionEvidenceProvider { region(it.tripId) }): Triple<FileTripRepository, TripCoordinator, PostDriveCoordinator> {
-        val r = FileTripRepository(dir, RuntimeMode.DEMO); success(r.load()); success(r.setConsent(ConsentScope.TRIP_HISTORY, true, 1, DataSource.SIMULATED)); success(r.save(record(), 0))
+        val r = encryptedTestRepository(dir, RuntimeMode.DEMO); success(r.load()); success(r.setConsent(ConsentScope.TRIP_HISTORY, true, 1, DataSource.SIMULATED)); success(r.save(record(), 0))
         val t = TripCoordinator(r, RuntimeMode.DEMO, clock, TripIdSource { "new-trip" }); t.initialize()
         val p = PostDriveCoordinator(t,r,RuntimeMode.DEMO,clock,{ context },provider); p.refresh()
         return Triple(r,t,p)
@@ -171,13 +172,13 @@ class PostDriveFoundationTest {
     }
     @Test fun schemaTwoReopensReflectionReviewVisitPostcardAndClaimWithoutDuplication() = runBlocking {
         val dir=temporary.newFolder(); val (r,_,p)=setup(dir); p.open("trip"); p.reflect(ReflectionMood.GOOD,"saved",true); p.complete()
-        val reopened=FileTripRepository(dir,RuntimeMode.DEMO); success(reopened.load())
+        val reopened=encryptedTestRepository(dir,RuntimeMode.DEMO); success(reopened.load())
         assertEquals(r.state.value,reopened.state.value); assertTrue(reopened.state.value.postDrive["trip"]!!.revealConsumed)
-        DataInputStream(File(dir,"trips.v1.bin").inputStream()).use { it.readUTF(); assertEquals(3,it.readInt()) }
+        DataInputStream(io.booup.roadmate.testing.testPlaintext(File(dir,"trips.v1.bin"),RuntimeMode.DEMO).inputStream()).use { it.readUTF(); assertEquals(4,it.readInt()) }
     }
     @Test fun alternateDeleteCollectionPolicyRemovesVisitAndPostcard() = runBlocking {
         val dir=temporary.newFolder(); val (r,_,p)=setup(dir); p.open("trip")
-        val other=FileTripRepository(dir,RuntimeMode.DEMO,CollectionRetentionPolicy.DELETE_WITH_SOURCE_TRIP); success(other.load()); success(other.delete("trip"))
+        val other=encryptedTestRepository(dir,RuntimeMode.DEMO,CollectionRetentionPolicy.DELETE_WITH_SOURCE_TRIP); success(other.load()); success(other.delete("trip"))
         assertTrue(other.state.value.postcards.isEmpty()); assertTrue(other.state.value.visits.isEmpty()); success(r.load())
     }
     @Test fun clearCollectionIsSeparateFromClearHistory() = runBlocking {
@@ -187,7 +188,7 @@ class PostDriveFoundationTest {
     }
     @Test fun processStyleReopenUsesStoredPostcardWithoutRequiringNewRegionEvidence() = runBlocking {
         val dir=temporary.newFolder(); val (_,_,first)=setup(dir); first.open("trip"); first.skip(); first.complete()
-        val r=FileTripRepository(dir,RuntimeMode.DEMO); success(r.load())
+        val r=encryptedTestRepository(dir,RuntimeMode.DEMO); success(r.load())
         val t=TripCoordinator(r,RuntimeMode.DEMO,clock,TripIdSource { "unused" }); t.initialize()
         val reopened=PostDriveCoordinator(t,r,RuntimeMode.DEMO,clock,{context})
         assertTrue(reopened.open("trip")); assertNotNull(reopened.uiState.value.session.postcard)
@@ -196,13 +197,13 @@ class PostDriveFoundationTest {
     @Test fun goldenMigrationFailureKeepsSchemaOneBytesAndReportsFailure() = runBlocking {
         val dir=temporary.newFolder(); val bytes=javaClass.getResourceAsStream("/schema1-golden.bin")!!.readBytes()
         val f=File(dir,"trips.v1.bin"); f.writeBytes(bytes); File(dir,"trips.pending").mkdir()
-        failure(StorageError.IO,FileTripRepository(dir,RuntimeMode.DEMO).load()); assertArrayEquals(bytes,f.readBytes())
+        failure(StorageError.IO,encryptedTestRepository(dir,RuntimeMode.DEMO).load()); assertArrayEquals(bytes,f.readBytes())
     }
     @Test fun schemaTwoCorruptionAndWrongModeFailClosed() = runBlocking {
         val dir=temporary.newFolder(); val (_,_,p)=setup(dir); p.open("trip")
-        failure(StorageError.WRONG_ENVIRONMENT,FileTripRepository(dir,RuntimeMode.PRODUCTION).load())
+        failure(StorageError.WRONG_ENVIRONMENT,encryptedTestRepository(dir,RuntimeMode.PRODUCTION).load())
         val f=File(dir,"trips.v1.bin"); val damaged=f.readBytes().dropLast(1).toByteArray(); f.writeBytes(damaged)
-        failure(StorageError.INVALID_DATA,FileTripRepository(dir,RuntimeMode.DEMO).load()); assertArrayEquals(damaged,f.readBytes())
+        failure(StorageError.INVALID_DATA,encryptedTestRepository(dir,RuntimeMode.DEMO).load()); assertArrayEquals(damaged,f.readBytes())
     }
     @Test fun productionRejectsDemoRegionEvenWhenClaimedVerified() {
         assertEquals(PostcardEligibility.UNAVAILABLE_REGION,PostcardPolicy().evaluate(record().copy(source=DataSource.DERIVED),PostDriveState.READY,region(),emptyList(),RuntimeMode.PRODUCTION))

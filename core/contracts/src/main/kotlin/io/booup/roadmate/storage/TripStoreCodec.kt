@@ -3,13 +3,18 @@ package io.booup.roadmate.storage
 import io.booup.roadmate.model.*
 import java.io.*
 
-/** Explicit schema1/2 compatibility; schema3 writes. Unknown data is never reset. */
+/** Domain schema1/2/3 compatibility; schema4 adds explicit preference. Envelope version is separate. */
 internal class TripStoreCodec(private val mode: RuntimeMode) {
     private val maxFileBytes = 8L * 1_024 * 1_024
     private val maxRows = 10_000
     private val maxTextChars = 4_096
     fun validate(s: TripStorageState) {
         verifyStore(s.captureGeneration >= 0)
+        s.preferredCabinTemperature?.let { p ->
+            verifyStore(s.consents[ConsentScope.FUNCTIONAL_PREFERENCE]?.granted==true,StorageError.CONSENT_REQUIRED)
+            verifyStore(p.source==if(mode==RuntimeMode.DEMO) DataSource.SIMULATED else DataSource.USER_INPUT,StorageError.WRONG_ENVIRONMENT)
+            verifyStore(p.confirmedAtEpochMillis==s.consents[ConsentScope.FUNCTIONAL_PREFERENCE]?.grantedAtEpochMillis)
+        }
         verifyStore(s.trips.size <= maxRows && s.memories.size <= maxRows, StorageError.LIMIT_EXCEEDED)
         verifyStore(s.trips.map { it.tripId }.distinct().size == s.trips.size)
         verifyStore(s.memories.map { it.memoryId }.distinct().size == s.memories.size)
@@ -77,10 +82,10 @@ internal class TripStoreCodec(private val mode: RuntimeMode) {
         verifyStore(s.visits.size == s.postcards.size)
         ProgressStoreCodec(mode).validate(s)
     }
-    fun write(file: File, state: TripStorageState) {
+    fun encode(state: TripStorageState): ByteArray {
         validate(state)
         val bytes = ByteArrayOutputStream().also { buffer -> DataOutputStream(buffer).use { out ->
-            out.writeUTF("ROADmate-local"); out.writeInt(3); out.writeUTF(mode.name); out.writeLong(state.captureGeneration)
+            out.writeUTF("ROADmate-local"); out.writeInt(4); out.writeUTF(mode.name); out.writeLong(state.captureGeneration)
             out.writeInt(state.consents.size)
             state.consents.toSortedMap(compareBy { it.name }).values.forEach { c ->
                 out.text(c.scope.name); out.writeBoolean(c.granted); out.number(c.grantedAtEpochMillis); out.number(c.revokedAtEpochMillis); out.text(c.source.name); out.text(c.version)
@@ -103,17 +108,19 @@ internal class TripStoreCodec(private val mode: RuntimeMode) {
             state.postcards.forEach { p -> out.text(p.key.regionId.value); out.text(p.regionLabel); out.optional(p.sourceTripId); out.writeBoolean(p.sourceTripDeleted)
                 out.writeLong(p.acquiredAtEpochMillis); out.text(p.calendar.season.name); out.text(p.calendar.timeOfDay.name); out.text(p.calendar.zoneId); out.text(p.source.name) }
             ProgressStoreCodec(mode).write(out,state.progression)
+            out.writeBoolean(state.preferredCabinTemperature!=null)
+            state.preferredCabinTemperature?.let { p -> out.writeDouble(p.valueCelsius); out.text(p.source.name); out.writeLong(p.confirmedAtEpochMillis) }
         } }.toByteArray()
         verifyStore(bytes.size <= maxFileBytes, StorageError.LIMIT_EXCEEDED)
-        FileOutputStream(file).use { it.write(bytes); it.fd.sync() }
+        return bytes
     }
-    fun read(file: File): TripStorageState {
-        verifyStore(file.length() <= maxFileBytes, StorageError.LIMIT_EXCEEDED)
+    fun decode(bytes: ByteArray): TripStorageState {
+        verifyStore(bytes.size <= maxFileBytes, StorageError.LIMIT_EXCEEDED)
         try {
-            DataInputStream(BufferedInputStream(FileInputStream(file))).use { input ->
+            DataInputStream(ByteArrayInputStream(bytes)).use { input ->
                 verifyStore(input.readUTF() == "ROADmate-local")
                 val version = input.readInt()
-                verifyStore(version in 1..3, StorageError.INCOMPATIBLE_SCHEMA)
+                verifyStore(version in 1..4, StorageError.INCOMPATIBLE_SCHEMA)
                 verifyStore(input.readUTF() == mode.name, StorageError.WRONG_ENVIRONMENT)
                 val generation = input.readLong()
                 val consentList = List(input.count()) { ConsentRecord(enumValueOf(input.text()), input.readBoolean(), input.number(), input.number(), enumValueOf(input.text()), input.text()) }
@@ -133,15 +140,15 @@ internal class TripStoreCodec(private val mode: RuntimeMode) {
                 val postcards = if (version == 1) emptyList() else List(input.count()) { Postcard(PostcardKey(RegionId(input.text())), input.text(), input.optional(), input.readBoolean(),
                     input.readLong(), CalendarAttributes(enumValueOf(input.text()), enumValueOf(input.text()), input.text()), enumValueOf(input.text())) }
                 val progress=if(version<3) ProgressData() else ProgressStoreCodec(mode).read(input)
+                val preference=if(version>=4 && input.readBoolean()) PreferredCabinTemperature(input.readDouble(),enumValueOf(input.text()),input.readLong()) else null
                 verifyStore(input.read() == -1)
                 return TripStorageState(true, trips = trips, active = active, consents = consentList.associateBy { it.scope }, memories = memories, captureGeneration = generation,
-                    postDrive = metadata.associateBy { it.tripId }, visits = visits, postcards = postcards, progression=progress).also { validate(it) }
+                    postDrive = metadata.associateBy { it.tripId }, visits = visits, postcards = postcards, progression=progress,preferredCabinTemperature=preference).also { validate(it) }
             }
         } catch (e: StoreException) { throw e }
         catch (_: IOException) { throw StoreException(StorageError.INVALID_DATA) }
         catch (_: IllegalArgumentException) { throw StoreException(StorageError.INVALID_DATA) }
     }
-    fun version(file: File): Int = DataInputStream(FileInputStream(file)).use { it.readUTF(); it.readInt() }
     private fun DataOutputStream.optional(value: String?) { writeBoolean(value != null); value?.let { text(it) } }
     private fun DataInputStream.optional(): String? = if (readBoolean()) text() else null
     private fun DataOutputStream.text(s: String) { verifyStore(s.length <= maxTextChars, StorageError.LIMIT_EXCEEDED); writeUTF(s) }

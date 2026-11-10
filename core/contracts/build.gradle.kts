@@ -9,6 +9,7 @@ java {
 }
 kotlin {
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    sourceSets.getByName("test").kotlin.srcDir("src/testSupport/kotlin")
 }
 dependencies {
     api(project(":core:model"))

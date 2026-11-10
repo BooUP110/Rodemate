@@ -28,6 +28,7 @@ data class RuntimeBinding(
     val postDrive: PostDriveCoordinator? = null,
     val progress: io.booup.roadmate.progress.ProgressCoordinator? = null,
     val onCareDecision: ((io.booup.roadmate.model.CareDecision) -> Unit)? = null,
+    val comfort: io.booup.roadmate.local.ComfortCoordinator? = null,
 ) {
     init { require(presentationTickMillis > 0) }
 }

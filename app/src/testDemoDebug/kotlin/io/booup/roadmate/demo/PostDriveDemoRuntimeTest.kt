@@ -1,5 +1,6 @@
 package io.booup.roadmate.demo
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import io.booup.roadmate.care.DeterministicCareEngine
 import io.booup.roadmate.context.VehicleContextStore
 import io.booup.roadmate.model.*
@@ -24,7 +25,7 @@ class PostDriveDemoRuntimeTest(private val id: PostDriveDemoId) {
         var elapsed=0L; var serial=0
         val clock=ContextClock { ObservationTime(1_000_000+elapsed,100_000+elapsed) }
         val adapter=DemoVehicleAdapter(clock); val store=VehicleContextStore(adapter,RuntimeMode.DEMO,clock,backgroundScope)
-        val dir=temporary.newFolder(); val repository=FileTripRepository(dir,RuntimeMode.DEMO)
+        val dir=temporary.newFolder(); val repository=encryptedTestRepository(dir,RuntimeMode.DEMO)
         val trips=TripCoordinator(repository,RuntimeMode.DEMO,clock,TripIdSource { "p5-${++serial}" },TripConfig(3000,5000))
         val post=PostDriveCoordinator(trips,repository,RuntimeMode.DEMO,clock,{store.context.value},PostDriveDemoScenarios.provider(adapter))
         val controller=PostDriveDemoController(adapter,trips,post,repository,backgroundScope)
@@ -55,14 +56,14 @@ class PostDriveDemoRuntimeTest(private val id: PostDriveDemoId) {
             PostDriveDemoId.P5_13_DELETE -> { assertTrue(s.trips.isEmpty()); assertTrue(s.postDrive.isEmpty()); assertTrue(s.memories.isEmpty()); assertNull(s.postcards.single().sourceTripId); assertTrue(s.postcards.single().sourceTripDeleted) }
             PostDriveDemoId.P5_14_REGION_ISOLATION -> {
                 assertEquals(RegionEvidenceSource.DEMO,s.postcards.single().source)
-                val prod=FileTripRepository(File(temporary.newFolder(),"production"),RuntimeMode.PRODUCTION)
+                val prod=encryptedTestRepository(File(temporary.newFolder(),"production"),RuntimeMode.PRODUCTION)
                 assertEquals(StorageResult.Success(Unit),prod.load()); assertTrue(prod.state.value.postcards.isEmpty())
                 val t=s.trips.single(); assertEquals(PostcardEligibility.UNAVAILABLE_REGION,
                     PostcardPolicy().evaluate(t.copy(source=DataSource.DERIVED),PostDriveState.READY,
                         PostDriveDemoScenarios.region(id,t),emptyList(),RuntimeMode.PRODUCTION))
             }
         }
-        val reopened=FileTripRepository(dir,RuntimeMode.DEMO); assertEquals(StorageResult.Success(Unit),reopened.load())
+        val reopened=encryptedTestRepository(dir,RuntimeMode.DEMO); assertEquals(StorageResult.Success(Unit),reopened.load())
         assertEquals(s,reopened.state.value)
         store.background(); runCurrent(); post.refresh(); assertFalse(post.uiState.value.contentAllowed); store.close()
     }

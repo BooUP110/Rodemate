@@ -1,5 +1,6 @@
 package io.booup.roadmate.demo
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import io.booup.roadmate.care.DeterministicCareEngine
 import io.booup.roadmate.context.VehicleContextStore
 import io.booup.roadmate.model.*
@@ -27,7 +28,7 @@ class TripDemoRuntimeTest(private val id: TripDemoScenarioId) {
         val store = VehicleContextStore(adapter, RuntimeMode.DEMO, clock, backgroundScope)
         val engine = DeterministicCareEngine(clock)
         val root = temporary.newFolder()
-        val repository = FileTripRepository(File(root, "demo"), RuntimeMode.DEMO)
+        val repository = encryptedTestRepository(File(root, "demo"), RuntimeMode.DEMO)
         var serial = 0
         val trips = TripCoordinator(repository, RuntimeMode.DEMO, clock, TripIdSource { "demo-trip-${++serial}" },
             TripConfig(TripDemoScenarios.START_MILLIS, TripDemoScenarios.STOP_MILLIS))
@@ -74,7 +75,7 @@ class TripDemoRuntimeTest(private val id: TripDemoScenarioId) {
                 assertEquals(PostDriveState.DELETED, s.postDrive)
             }
             TripDemoScenarioId.T9_STORAGE_ISOLATION -> {
-                val production = FileTripRepository(File(root, "production"), RuntimeMode.PRODUCTION)
+                val production = encryptedTestRepository(File(root, "production"), RuntimeMode.PRODUCTION)
                 assertEquals(StorageResult.Success(Unit), production.load()); assertTrue(production.state.value.trips.isEmpty())
                 assertEquals(1, s.storage.trips.size)
             }
@@ -90,7 +91,7 @@ class TripDemoRuntimeTest(private val id: TripDemoScenarioId) {
                 assertNull(r.startLocation); assertNull(r.endLocation); assertNull(r.routeSummary); assertNull(r.distanceMeters)
             }
         }
-        val reopened = FileTripRepository(File(root, "demo"), RuntimeMode.DEMO)
+        val reopened = encryptedTestRepository(File(root, "demo"), RuntimeMode.DEMO)
         assertEquals(StorageResult.Success(Unit), reopened.load())
         assertEquals(s.storage.trips, reopened.state.value.trips); assertEquals(s.storage.memories, reopened.state.value.memories)
         assertTrue(s.storage.trips.all { it.source == DataSource.SIMULATED })

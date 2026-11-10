@@ -32,6 +32,12 @@ interface TripRepository {
     suspend fun saveMemory(memory: PersistentEmotionalMemory): StorageResult<Unit>
 }
 
+/** Shares the encrypted aggregate; deletion does not alter history/progress consent. */
+interface ComfortPreferenceRepository {
+    val state:StateFlow<TripStorageState>
+    suspend fun setPreferredTemperature(preference:PreferredCabinTemperature?,atEpochMillis:Long,source:DataSource):StorageResult<Unit>
+}
+
 /** Same atomic store as TripRepository: cascade and first-visit issuance cannot diverge. */
 interface CollectionRepository {
     val state: StateFlow<TripStorageState>

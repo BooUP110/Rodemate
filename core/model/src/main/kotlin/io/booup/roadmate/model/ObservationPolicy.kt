@@ -38,6 +38,15 @@ fun Reading<*>.availability(): Availability = when (this) {
     }
 }
 
+/** Same-session GET can finish after a newer callback. Keep the newest evidence, never its age. */
+fun Reading<*>.isOlderObservationThan(previous:Reading<*>):Boolean {
+    if(this !is Reading.Observed || previous !is Reading.Observed ||
+        availability()!=Availability.SUPPORTED || metadata.source!=previous.metadata.source) return false
+    val incoming=metadata.observedAtMonotonicMillis ?: return false
+    val accepted=previous.metadata.observedAtMonotonicMillis ?: return false
+    return incoming<accepted
+}
+
 /** Never trust a cached FRESH label. Future/invalid clocks are unusable, never clamped to age 0. */
 fun <T : Any> Reading<T>.evaluate(
     now: ObservationTime,

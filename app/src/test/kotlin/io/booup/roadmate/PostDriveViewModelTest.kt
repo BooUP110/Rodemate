@@ -1,5 +1,6 @@
 package io.booup.roadmate
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import androidx.lifecycle.*
 import io.booup.roadmate.care.DeterministicCareEngine
 import io.booup.roadmate.context.VehicleContextStore
@@ -37,7 +38,7 @@ class PostDriveViewModelTest {
     private data class Environment(val model:RoadmateViewModel,val source:Source,val owner:ViewModelStore,val repository:FileTripRepository)
     private suspend fun create():Environment {
         val clock=ContextClock { ObservationTime(1_000_000,100_000) }; val source=Source()
-        val repository=FileTripRepository(temporary.newFolder(),RuntimeMode.DEMO)
+        val repository=encryptedTestRepository(temporary.newFolder(),RuntimeMode.DEMO)
         repository.load(); repository.setConsent(ConsentScope.TRIP_HISTORY,true,1,DataSource.SIMULATED)
         repository.save(TripRecord("saved",TripState.COMPLETED,100,200,DataSource.SIMULATED,100,50,
             completionReason=TripCompletionReason.CONFIRMED_STATIONARY,quality=TripDataQuality.PARTIAL,createdAtEpochMillis=200),0)

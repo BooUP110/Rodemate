@@ -1,5 +1,6 @@
 package io.booup.roadmate.progress
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import io.booup.roadmate.model.*
 import io.booup.roadmate.storage.*
 import io.booup.roadmate.trip.*
@@ -13,15 +14,15 @@ import java.io.DataInputStream
 
 class ProgressRepositoryTest {
     @get:Rule val temporary=TemporaryFolder()
-    private suspend fun setup(dir:File=temporary.newFolder(),s:Season=season()):FileTripRepository=FileTripRepository(dir,RuntimeMode.DEMO).also {
+    private suspend fun setup(dir:File=temporary.newFolder(),s:Season=season()):FileTripRepository=encryptedTestRepository(dir,RuntimeMode.DEMO).also {
         success(it.load()); success(it.setConsent(ConsentScope.TRIP_HISTORY,true,1,DataSource.SIMULATED)); success(it.save(record(),0)); success(it.installSeasons(listOf(s)))
     }
     private suspend fun run(r:FileTripRepository,time:Long=1000)=r.reconcileProgress(now(time),r.state.value.captureGeneration,r.state.value.progression.generation)
     @Test fun actualLedgerReopensAndRepeatedReconcileDoesNotAddXp()=runBlocking {
         val dir=temporary.newFolder(); val r=setup(dir); success(run(r)); success(run(r))
         assertEquals(20L,r.state.value.progression.ledger.sumOf { it.awardedXp }); assertEquals(1,r.state.value.progression.ledger.size)
-        val reopened=FileTripRepository(dir,RuntimeMode.DEMO); success(reopened.load()); assertEquals(r.state.value,reopened.state.value)
-        DataInputStream(File(dir,"trips.v1.bin").inputStream()).use { it.readUTF(); assertEquals(3,it.readInt()) }
+        val reopened=encryptedTestRepository(dir,RuntimeMode.DEMO); success(reopened.load()); assertEquals(r.state.value,reopened.state.value)
+        DataInputStream(io.booup.roadmate.testing.testPlaintext(File(dir,"trips.v1.bin"),RuntimeMode.DEMO).inputStream()).use { it.readUTF(); assertEquals(4,it.readInt()) }
     }
     @Test fun freeClaimIsSeparateAndIdempotentInTransaction()=runBlocking {
         val r=setup(); success(run(r)); assertTrue(r.state.value.progression.claims.isEmpty())
@@ -37,7 +38,7 @@ class ProgressRepositoryTest {
         success(r.setSimulatedPremium("season",false)); assertEquals(1,r.state.value.progression.claims.size)
     }
     @Test fun productionRejectsSimulatedPremiumAndSeasonResetEntryPoints()=runBlocking {
-        val r=FileTripRepository(temporary.newFolder(),RuntimeMode.PRODUCTION); success(r.load()); success(r.installSeasons(listOf(season())))
+        val r=encryptedTestRepository(temporary.newFolder(),RuntimeMode.PRODUCTION); success(r.load()); success(r.installSeasons(listOf(season())))
         failure(StorageError.WRONG_ENVIRONMENT,r.setSimulatedPremium("season",true))
         failure(StorageError.WRONG_ENVIRONMENT,r.resetSimulatedSeasons(listOf(season()))); assertTrue(r.state.value.progression.premiumSeasons.isEmpty())
     }
@@ -45,7 +46,7 @@ class ProgressRepositoryTest {
         val dir=temporary.newFolder(); val r=setup(dir); success(run(r)); success(r.claimReward("season","free",now(),0)); success(r.delete("trip"))
         val d=r.state.value.progression; assertEquals(20L,d.ledger.sumOf { it.awardedXp }); assertEquals(1,d.claims.size)
         assertNull(d.ledger.single().sourceId); assertNull(d.ledger.single().sourceTripId); assertTrue(d.ledger.single().sourceDeleted)
-        val reopened=FileTripRepository(dir,RuntimeMode.DEMO); success(reopened.load()); assertEquals(d,reopened.state.value.progression)
+        val reopened=encryptedTestRepository(dir,RuntimeMode.DEMO); success(reopened.load()); assertEquals(d,reopened.state.value.progression)
         success(run(reopened)); assertEquals(d,reopened.state.value.progression)
     }
     @Test fun clearHistoryAndConsentRevocationAlsoDetachLedgerWithoutXpPenalty()=runBlocking {
@@ -72,14 +73,14 @@ class ProgressRepositoryTest {
     }
     @Test fun corruptedOrWrongModeSchemaThreeFailsClosedWithOriginalBytesPreserved()=runBlocking {
         val dir=temporary.newFolder(); val r=setup(dir); success(run(r))
-        failure(StorageError.WRONG_ENVIRONMENT,FileTripRepository(dir,RuntimeMode.PRODUCTION).load())
+        failure(StorageError.WRONG_ENVIRONMENT,encryptedTestRepository(dir,RuntimeMode.PRODUCTION).load())
         val f=File(dir,"trips.v1.bin"); val broken=f.readBytes().dropLast(3).toByteArray(); f.writeBytes(broken)
-        failure(StorageError.INVALID_DATA,FileTripRepository(dir,RuntimeMode.DEMO).load()); assertArrayEquals(broken,f.readBytes())
+        failure(StorageError.INVALID_DATA,encryptedTestRepository(dir,RuntimeMode.DEMO).load()); assertArrayEquals(broken,f.readBytes())
     }
     @Test fun schemaTwoMigrationWriteFailurePreservesGoldenBytes()=runBlocking {
         val dir=temporary.newFolder(); val bytes=javaClass.getResourceAsStream("/schema2-golden.bin")!!.use { it.readBytes() }
         val f=File(dir,"trips.v1.bin"); f.writeBytes(bytes); File(dir,"trips.pending").mkdir()
-        failure(StorageError.IO,FileTripRepository(dir,RuntimeMode.DEMO).load()); assertArrayEquals(bytes,f.readBytes())
+        failure(StorageError.IO,encryptedTestRepository(dir,RuntimeMode.DEMO).load()); assertArrayEquals(bytes,f.readBytes())
     }
     @Test fun invalidSeasonUpdateOverlapAndTimezoneSwitchAreRejected()=runBlocking {
         val r=setup(); failure(StorageError.INVALID_DATA,r.installSeasons(listOf(season().copy(title="changed"))))

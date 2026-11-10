@@ -1,5 +1,6 @@
 package io.booup.roadmate.trip
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import io.booup.roadmate.model.*
 import io.booup.roadmate.storage.FileTripRepository
 import kotlinx.coroutines.runBlocking
@@ -25,7 +26,7 @@ internal fun failure(error: StorageError, result: StorageResult<Unit>) { assertE
 class TripStorageTest {
     @get:Rule val temporary = TemporaryFolder()
     private fun directory() = temporary.newFolder()
-    private fun repo(dir: File) = FileTripRepository(dir, RuntimeMode.DEMO)
+    private fun repo(dir: File) = encryptedTestRepository(dir, RuntimeMode.DEMO)
     private suspend fun granted(dir: File): FileTripRepository = repo(dir).also {
         success(it.load()); success(it.setConsent(ConsentScope.TRIP_HISTORY, true, 1, DataSource.SIMULATED))
     }
@@ -159,12 +160,12 @@ class TripStorageTest {
     }
     @Test fun productionCannotLoadDemoFileAndSeparateDirectoriesDoNotMix() = runBlocking {
         val dir = directory(); val demo = granted(File(dir, "demo")); success(demo.save(record(), 0))
-        val production = FileTripRepository(File(dir, "production"), RuntimeMode.PRODUCTION); success(production.load())
+        val production = encryptedTestRepository(File(dir, "production"), RuntimeMode.PRODUCTION); success(production.load())
         assertTrue(production.state.value.trips.isEmpty())
-        failure(StorageError.WRONG_ENVIRONMENT, FileTripRepository(File(dir, "demo"), RuntimeMode.PRODUCTION).load())
+        failure(StorageError.WRONG_ENVIRONMENT, encryptedTestRepository(File(dir, "demo"), RuntimeMode.PRODUCTION).load())
     }
     @Test fun productionRejectsSimulatedConsentAndTripFixture() = runBlocking {
-        val production = FileTripRepository(directory(), RuntimeMode.PRODUCTION); success(production.load())
+        val production = encryptedTestRepository(directory(), RuntimeMode.PRODUCTION); success(production.load())
         failure(StorageError.INVALID_DATA, production.setConsent(ConsentScope.TRIP_HISTORY, true, 1, DataSource.SIMULATED))
         success(production.setConsent(ConsentScope.TRIP_HISTORY, true, 1, DataSource.USER_INPUT))
         failure(StorageError.WRONG_ENVIRONMENT, production.save(record(), 0))

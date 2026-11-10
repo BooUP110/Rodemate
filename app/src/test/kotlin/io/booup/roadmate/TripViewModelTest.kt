@@ -1,5 +1,6 @@
 package io.booup.roadmate
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import androidx.lifecycle.*
 import io.booup.roadmate.care.DeterministicCareEngine
 import io.booup.roadmate.context.VehicleContextStore
@@ -37,7 +38,7 @@ class TripViewModelTest {
         var elapsed = 0L
         val clock = ContextClock { ObservationTime(1_000_000 + elapsed, 100_000 + elapsed) }
         val dir = temporary.newFolder(); val source = Source()
-        val trips = TripCoordinator(FileTripRepository(dir, RuntimeMode.DEMO), RuntimeMode.DEMO, clock,
+        val trips = TripCoordinator(encryptedTestRepository(dir, RuntimeMode.DEMO), RuntimeMode.DEMO, clock,
             TripIdSource { "viewmodel-trip" }, TripConfig(10, 20))
         val owner = object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() }
         val model = ViewModelProvider(owner, object : ViewModelProvider.Factory {
@@ -56,7 +57,7 @@ class TripViewModelTest {
             }
             assertEquals(PostDriveState.READY, model.tripUiState.value.postDrive)
             assertEquals(1, model.tripUiState.value.storage.trips.size)
-            val reopened = FileTripRepository(dir, RuntimeMode.DEMO); assertEquals(StorageResult.Success(Unit), reopened.load())
+            val reopened = encryptedTestRepository(dir, RuntimeMode.DEMO); assertEquals(StorageResult.Success(Unit), reopened.load())
             assertEquals("viewmodel-trip", reopened.state.value.trips.single().tripId)
             model.background().join(); assertEquals(PostDriveState.NOT_READY, model.tripUiState.value.postDrive)
         } finally { clearAndAwaitViewModel(owner.viewModelStore, model) }

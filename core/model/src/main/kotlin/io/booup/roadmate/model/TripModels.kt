@@ -47,7 +47,8 @@ data class PersistentEmotionalMemory(
     val createdAtEpochMillis: Long, val source: DataSource,
     val confirmedByUser: Boolean = false,
 ) : TripLinkedRecord
-enum class StorageError { NOT_LOADED, IO, INVALID_DATA, INCOMPATIBLE_SCHEMA, WRONG_ENVIRONMENT, CONSENT_REQUIRED, DUPLICATE_ID, NOT_FOUND, LIMIT_EXCEEDED }
+enum class StorageError { NOT_LOADED, IO, INVALID_DATA, INCOMPATIBLE_SCHEMA, WRONG_ENVIRONMENT, CONSENT_REQUIRED, DUPLICATE_ID, NOT_FOUND, LIMIT_EXCEEDED,
+    KEY_MISSING, KEY_INVALIDATED, AUTHENTICATION_FAILED, ENCRYPTION_UNAVAILABLE }
 sealed interface StorageResult<out T> {
     data class Success<T>(val value: T) : StorageResult<T>
     data class Failure(val error: StorageError) : StorageResult<Nothing>
@@ -63,6 +64,7 @@ data class TripStorageState(
     val visits: List<RegionVisitRecord> = emptyList(),
     val postcards: List<Postcard> = emptyList(),
     val progression: ProgressData = ProgressData(),
+    val preferredCabinTemperature: PreferredCabinTemperature? = null,
 )
 data class TripUiState(
     val runtime: TripRuntimeStatus = TripRuntimeStatus(),

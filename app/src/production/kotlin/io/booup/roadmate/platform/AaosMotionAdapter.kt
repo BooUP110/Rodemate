@@ -145,6 +145,7 @@ class AaosMotionAdapter(
                 val raw = value.value as? Float
                 if (raw == null || !raw.isFinite()) { unavailable(id, UnavailableReason.INVALID_DATA); return }
                 val speed = Reading.Observed(raw.toDouble(), metadata)
+                if(speed.isOlderObservationThan(frame.speedMetersPerSecond)) return
                 frame.copy(speedMetersPerSecond = speed, motion = classifier.classify(speed, now))
             }
             VehiclePropertyIds.GEAR_SELECTION -> {

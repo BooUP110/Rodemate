@@ -25,6 +25,7 @@ fun PostDriveContent(viewModel: RoadmateViewModel) {
         Text("드라이브 기억", style = MaterialTheme.typography.headlineMedium)
         Text("함께 달린 순간을, 확인된 기록과 직접 남긴 이야기로 간직해요.", style = MaterialTheme.typography.bodyMedium)
         StorageNotice(state.error)
+        MemoryRecallContent(viewModel)
         state.session.card?.let { card ->
             RoadmateCard(tinted = true) {
                 RoadmateBadge(if (card.source == DataSource.SIMULATED) "SIMULATED · 기억 카드" else "기억 카드")
@@ -163,6 +164,7 @@ fun RecordSettingsContent(viewModel: RoadmateViewModel) {
         Text("나의 동행 설정", style = MaterialTheme.typography.headlineMedium)
         Text("기록은 이 기기에만 보관해요. 저장할지는 직접 선택해 주세요.", style = MaterialTheme.typography.bodyMedium)
         StorageNotice(state.error)
+        ComfortSettingsContent(viewModel)
         RoadmateCard {
             Text("드라이브 기록", style = MaterialTheme.typography.titleLarge)
             Text(if (state.historyEnabled) "저장 켜짐" else "저장 꺼짐", style = MaterialTheme.typography.bodyLarge)
@@ -239,9 +241,5 @@ fun CollectionContent(viewModel: RoadmateViewModel) {
 @Composable
 private fun StorageNotice(error: StorageError?) {
     if (error == null) return
-    Text(when (error) {
-        StorageError.CONSENT_REQUIRED -> "기록 저장 동의와 별도 확인이 필요해요."
-        StorageError.NOT_FOUND -> "기록이 삭제되었거나 변경됐어요."
-        else -> "저장을 완료하지 못했어요. 기존 기록은 임의로 지우지 않았어요."
-    }, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+    Text(UiCopy.storageError(error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
 }

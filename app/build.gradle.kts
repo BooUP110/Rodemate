@@ -4,13 +4,18 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Opt-in acceptance APK uses the exact Production sources with an isolated UID/data/Keystore.
+// It never builds a release artifact or replaces the user's normal package/store.
+val isolatedAcceptance=providers.gradleProperty("phase86IsolatedAcceptance").isPresent
+if(isolatedAcceptance) layout.buildDirectory.set(layout.projectDirectory.dir("build/phase86-acceptance"))
+
 android {
     namespace = "io.booup.roadmate"
     compileSdk = 35
     buildToolsVersion = "35.0.1"
 
     defaultConfig {
-        applicationId = "io.booup.roadmate"
+        applicationId = if(isolatedAcceptance) "io.booup.roadmate.acceptance" else "io.booup.roadmate"
         minSdk = 28
         targetSdk = 35
         versionCode = 1
@@ -28,7 +33,7 @@ android {
         create("production") {
             dimension = "environment"
             // Framework Instrumentation only; runner is packaged in the separate test APK.
-            testInstrumentationRunner = "io.booup.roadmate.integration.ClosureInstrumentation"
+            testInstrumentationRunner = "io.booup.roadmate.integration.Phase86Instrumentation"
         }
     }
     buildTypes {
@@ -42,6 +47,7 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    sourceSets.getByName("test").java.srcDir("../core/contracts/src/testSupport/kotlin")
     // Platform-provided AAOS API, not packaged SDK classes or an invented Maven artifact.
     useLibrary("android.car")
 }
@@ -49,7 +55,7 @@ android {
 // Prevent a release artifact that could accidentally contain demo fixtures.
 androidComponents {
     beforeVariants(selector().withBuildType("release")) { variant ->
-        if (variant.productFlavors.any { it.second == "demo" }) variant.enable = false
+        if (isolatedAcceptance || variant.productFlavors.any { it.second == "demo" }) variant.enable = false
     }
 }
 

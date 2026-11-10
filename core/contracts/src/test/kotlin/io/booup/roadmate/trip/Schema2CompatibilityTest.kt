@@ -1,5 +1,6 @@
 package io.booup.roadmate.trip
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import io.booup.roadmate.model.*
 import io.booup.roadmate.storage.FileTripRepository
 import kotlinx.coroutines.runBlocking
@@ -14,7 +15,7 @@ class Schema2CompatibilityTest {
     @Test fun goldenSchemaTwoPreservesTripConsentReflectionCollectionAndActive()=runBlocking {
         val dir=temporary.newFolder()
         File(dir,"trips.v1.bin").writeBytes(javaClass.getResourceAsStream("/schema2-golden.bin")!!.use { it.readBytes() })
-        val r=FileTripRepository(dir,RuntimeMode.DEMO); success(r.load())
+        val r=encryptedTestRepository(dir,RuntimeMode.DEMO); success(r.load())
         assertEquals("legacy-trip",r.state.value.trips.single().tripId)
         assertEquals("legacy-active",r.state.value.active!!.tripId)
         assertEquals("Schema two local reflection",r.state.value.postDrive["legacy-trip"]!!.reflection!!.text)

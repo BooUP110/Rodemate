@@ -44,11 +44,14 @@ import io.booup.roadmate.postdrive.RegionEvidenceProvider
 object RuntimeBindings {
     val runtimePermissions: List<String> = emptyList()
     fun create(context: android.content.Context, scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null): RuntimeBinding =
-        create(scope, clock, storageRoot)
-    fun create(scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null): RuntimeBinding {
+        create(scope, clock, storageRoot, io.booup.roadmate.storage.AesGcmEnvelope(
+            io.booup.roadmate.security.AndroidStoreKeys("roadmate.demo.aggregate.v1"), RuntimeMode.DEMO))
+    fun create(scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null,
+        encryption: io.booup.roadmate.storage.StorageEncryption? = null): RuntimeBinding {
         val adapter = DemoVehicleAdapter(clock)
         val repository = VehicleContextStore(adapter, RuntimeMode.DEMO, clock, scope)
-        val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-demo"), RuntimeMode.DEMO) }
+        val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-demo"), RuntimeMode.DEMO,
+            encryption = requireNotNull(encryption)) }
         val trips = storage?.let { TripCoordinator(it,
             RuntimeMode.DEMO, clock, TripIdSource { UUID.randomUUID().toString() }, TripConfig(TripDemoScenarios.START_MILLIS, TripDemoScenarios.STOP_MILLIS)) }
         val controller = trips?.let { DemoTripController(adapter, it, clock, scope) }
@@ -66,6 +69,7 @@ object RuntimeBindings {
             clock = clock,
             trips = trips,
             postDrive = post,
+            comfort=storage?.let { io.booup.roadmate.local.ComfortCoordinator(it,RuntimeMode.DEMO,clock,{repository.context.value}) },
             progress=progress,
             simulationFeedback = DemoSimulationFeedback(adapter),
             onLaunch = { intent -> input.fromHost(intent.getStringExtra("roadmate.demo.scenario")) },

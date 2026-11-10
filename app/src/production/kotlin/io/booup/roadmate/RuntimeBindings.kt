@@ -47,7 +47,11 @@ object RuntimeBindings {
         val binding = bind(scope, clock, storageRoot, io.booup.roadmate.platform.PleosVehicleAdapter(clock, scope,
             { io.booup.roadmate.platform.SdkVehicleReadSession(context) }, log = logger,
             restrictionAdapter = io.booup.roadmate.platform.AaosDrivingRestrictionAdapter(context, clock, scope, log = logger),
-            motionAdapter = io.booup.roadmate.platform.AaosMotionAdapter(context, clock, scope, log = logger)))
+            motionAdapter = io.booup.roadmate.platform.AaosMotionAdapter(context, clock, scope, log = logger),
+            outsideAdapter = io.booup.roadmate.platform.AaosOutsideTemperatureAdapter(clock) {
+                io.booup.roadmate.platform.AaosOutsideTemperatureSession(context,scope,logger)
+            }),
+            io.booup.roadmate.storage.AesGcmEnvelope(io.booup.roadmate.security.AndroidStoreKeys("roadmate.production.aggregate.v1"), RuntimeMode.PRODUCTION))
         if (logging) scope.launch {
             binding.repository.context.map { state ->
                 "context connection=${state.connection.status} lowBeam=${state.lowBeam.currentValue} availability=${state.lowBeam.availability} source=${state.lowBeam.source} totalKm=${state.totalOdometerKilometers.currentValue} frontLeftTargetC=${state.frontLeftTargetTemperatureCelsius.currentValue} motion=${state.motion.currentValue} motionSource=${state.motion.source} seat=${state.frontLeftSeatOccupied.currentValue} driver=${state.driverPresent.currentValue} restriction=${state.restrictions.currentValue?.mode} seasonGate=${ContentGate().access(ContentArea.SEASON_PASS,state).allowed}"
@@ -65,12 +69,15 @@ object RuntimeBindings {
         })
     }
     /** Explicit platform-free composition retained for existing JVM contract tests. */
-    fun create(scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null): RuntimeBinding {
-        return bind(scope, clock, storageRoot, UnconfiguredVehicleAdapter())
+    fun create(scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null,
+        encryption: io.booup.roadmate.storage.StorageEncryption? = null): RuntimeBinding {
+        return bind(scope, clock, storageRoot, UnconfiguredVehicleAdapter(), encryption)
     }
-    private fun bind(scope: CoroutineScope, clock: ContextClock, storageRoot: File?, adapter: VehicleAdapter): RuntimeBinding {
+    private fun bind(scope: CoroutineScope, clock: ContextClock, storageRoot: File?, adapter: VehicleAdapter,
+        encryption: io.booup.roadmate.storage.StorageEncryption?): RuntimeBinding {
         val context = VehicleContextStore(adapter, RuntimeMode.PRODUCTION, clock, scope)
-        val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-production"), RuntimeMode.PRODUCTION) }
+        val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-production"), RuntimeMode.PRODUCTION,
+            encryption = requireNotNull(encryption)) }
         val trips = storage?.let { TripCoordinator(it, RuntimeMode.PRODUCTION, clock, TripIdSource { UUID.randomUUID().toString() }) }
         val post=trips?.let { PostDriveCoordinator(it,requireNotNull(storage),RuntimeMode.PRODUCTION,clock,{context.context.value}) }
         return RuntimeBinding(context,
@@ -78,6 +85,7 @@ object RuntimeBindings {
         clock = clock,
         trips = trips,
         postDrive = post,
+        comfort=storage?.let { io.booup.roadmate.local.ComfortCoordinator(it,RuntimeMode.PRODUCTION,clock,{context.context.value}) },
         progress=post?.let { io.booup.roadmate.progress.ProgressCoordinator(requireNotNull(storage),RuntimeMode.PRODUCTION,clock,{it.controlsAllowed()},
             listOf(io.booup.roadmate.progress.LocalSeasonCatalog.first)) },
     )

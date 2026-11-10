@@ -14,6 +14,7 @@ SDK/Android 연동, 결정적 로컬 판단, 화면 표현을 분리한다. 기�
 flowchart TD
     V[Pleos Vehicle 읽기] --> A[Production SDK Adapter]
     M[AAOS 물리 motion] --> A
+    O[AAOS 실제 외기 센서] --> A
     U[AAOS UX restrictions] --> A
     D[Demo 합성 Adapter] --> C[VehicleContextStore]
     A --> C
@@ -47,7 +48,13 @@ SafeProgressEngine은 저장된 사실과 고정 정책으로 원장·레벨·�
 
 ## 저장과 실행 변형
 
-현재 저장은 Room/외부 DB 없이 앱 전용 noBackupFilesDir 아래 FileTripRepository를 사용한다. schema1/2→3 변환과 실제 binary fixture 테스트를 유지한다. 삭제·동의 철회·시즌 보존 정책은 [안전 및 개인정보](SAFETY_AND_PRIVACY.md)를 따른다.
+현재 저장은 Room/외부 DB 없이 앱 전용 noBackupFilesDir 아래 FileTripRepository를 사용한다. Android Keystore + AES256-GCM envelope1로 보호하고 도메인 schema1/2/3 읽기 호환·schema4 쓰기와 실제 golden fixture를 유지한다. schema4의 명시 선호는 암호화 metadata와 별개다. [저장 보안](PHASE8_6_STORAGE_SECURITY.md)과 [migration](PHASE8_6_STORAGE_MIGRATION.md), [삭제·동의 정책](SAFETY_AND_PRIVACY.md)을 따른다.
+
+## Phase8.6의 독립 로컬 기능
+
+- Production의 OutsideTemperatureAdapter는 실제 `ENV_OUTSIDE_TEMPERATURE`를 읽어 기존 Reading/DataMetadata→VehicleContext로 전달한다. raw sensor timestamp·수신 시각을 분리하고 권한/지원/오류/최신성을 기존 모델로 평가한다. Demo에 실제 adapter/permission을 포함하지 않는다.
+- StationaryComfortRule은 명시 USER_INPUT 선호·fresh stationary·현재 UX 허용·실제 외기/front-left target을 요구한다. 기존 자동 HvacRule과 독립이며 CareEvent/ControlIntent/XP/driverPresent를 생성하지 않는다. 설정에서 명시 요청한 경우만 일반 수동 조절 안내를 표시한다.
+- MemoryRecallProjector는 동의된 현재 저장 데이터에서 최근 기억 preview와 UTC 월간 사실 요약을 계산한다. 요약 cache를 저장하지 않는다. 원문은 명시 열기 후만 표시하고 현재 데이터/동의/삭제/generation·주행 gate를 다시 검증한다. LLM·새 동의 모델은 없다.
 
 Production과 Demo는 별도 앱 ID·데이터 경로·composition root를 사용한다. 합성 값과 시나리오는 demoDebug에만 두고 Production에 자동 fallback하지 않는다. release Demo는 생성하지 않는다.
 

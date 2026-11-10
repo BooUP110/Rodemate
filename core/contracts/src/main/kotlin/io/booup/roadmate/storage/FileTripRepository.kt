@@ -3,6 +3,7 @@ package io.booup.roadmate.storage
 import io.booup.roadmate.contracts.TripRepository
 import io.booup.roadmate.contracts.CollectionRepository
 import io.booup.roadmate.contracts.SeasonRepository
+import io.booup.roadmate.contracts.ComfortPreferenceRepository
 import io.booup.roadmate.progress.*
 import io.booup.roadmate.postdrive.PostcardPolicy
 import io.booup.roadmate.model.*
@@ -26,7 +27,9 @@ internal fun verifyStore(condition: Boolean, error: StorageError = StorageError.
 
 /** App-private versioned storage. IO + fsync + atomic replace precede StateFlow publication. */
 class FileTripRepository(private val directory: File, private val mode: RuntimeMode,
-    private val collectionRetention: CollectionRetentionPolicy = CollectionRetentionPolicy.KEEP_WITHOUT_SOURCE_TRIP) : TripRepository, CollectionRepository, SeasonRepository {
+    private val collectionRetention: CollectionRetentionPolicy = CollectionRetentionPolicy.KEEP_WITHOUT_SOURCE_TRIP,
+    private val encryption: StorageEncryption,
+    private val beforeAtomicReplace: () -> Unit = {}) : TripRepository, CollectionRepository, SeasonRepository, ComfortPreferenceRepository {
     private val mutableState = MutableStateFlow(TripStorageState())
     override val state = mutableState.asStateFlow()
     private val file get() = File(directory, "trips.v1.bin")
@@ -34,6 +37,15 @@ class FileTripRepository(private val directory: File, private val mode: RuntimeM
     private val transactionMutex=Mutex()
 
     override suspend fun load(): StorageResult<Unit> = transaction(write = false) { it }
+    override suspend fun setPreferredTemperature(preference:PreferredCabinTemperature?,atEpochMillis:Long,source:DataSource):StorageResult<Unit> = transaction { current ->
+        verifyStore(source==if(mode==RuntimeMode.DEMO) DataSource.SIMULATED else DataSource.USER_INPUT)
+        val old=current.consents[ConsentScope.FUNCTIONAL_PREFERENCE]
+        verifyStore(atEpochMillis>=0 && atEpochMillis >= (old?.revokedAtEpochMillis ?: old?.grantedAtEpochMillis ?: 0))
+        verifyStore(preference==null || (preference.source==source && preference.confirmedAtEpochMillis==atEpochMillis))
+        current.copy(preferredCabinTemperature=preference,consents=current.consents+(ConsentScope.FUNCTIONAL_PREFERENCE to
+            ConsentRecord(ConsentScope.FUNCTIONAL_PREFERENCE,preference!=null,if(preference!=null) atEpochMillis else old?.grantedAtEpochMillis,
+                if(preference==null) atEpochMillis else null,source,"explicit-device-v1")))
+    }
     override suspend fun save(trip: TripRecord, expectedGeneration: Long): StorageResult<Unit> = transaction { current ->
         requireHistory(current, expectedGeneration)
         verifyStore(current.trips.none { it.tripId == trip.tripId }, StorageError.DUPLICATE_ID)
@@ -62,6 +74,7 @@ class FileTripRepository(private val directory: File, private val mode: RuntimeM
             if (granted) null else nowEpochMillis, source, "internal-v1")
         var next = current.copy(consents = current.consents + (scope to record))
         if (!granted && scope == ConsentScope.EMOTIONAL_MEMORY) next = next.copy(memories = emptyList())
+        if (!granted && scope == ConsentScope.FUNCTIONAL_PREFERENCE) next = next.copy(preferredCabinTemperature=null)
         if (!granted && scope == ConsentScope.TRIP_HISTORY) next = cascade(next.copy(trips = emptyList(), active = null,
             memories = emptyList(), captureGeneration = current.captureGeneration + 1), current.trips.map { it.tripId }.toSet())
         next
@@ -182,21 +195,41 @@ class FileTripRepository(private val directory: File, private val mode: RuntimeM
     }
     private suspend fun transaction(write: Boolean = true, mutate: (TripStorageState) -> TripStorageState): StorageResult<Unit> = transactionMutex.withLock { withContext(Dispatchers.IO) {
         var readSucceeded = false
+        var migrating = false
         try {
             Files.createDirectories(directory.toPath())
             FileChannel.open(File(directory, "store.lock").toPath(), CREATE, WRITE).use { channel ->
                 channel.lock().use {
                     // Reload under an OS file lock: separate Repository instances cannot overwrite stale state.
-                    val current = if (file.exists()) codec.read(file) else TripStorageState(loaded = true)
+                    val bytes = if (file.exists()) readBounded(file) else null
+                    val legacy = bytes != null && !AesGcmEnvelope.isEnvelope(bytes)
+                    migrating = legacy
+                    val current = if (bytes == null) TripStorageState(loaded = true) else {
+                        val plaintext = if (legacy) bytes else encryption.open(bytes)
+                        try { codec.decode(plaintext) } finally { plaintext.fill(0) }
+                    }
                     readSucceeded = true
+                    val abandoned = File(directory, "trips.pending")
+                    if (bytes != null && !legacy && abandoned.isFile) Files.deleteIfExists(abandoned.toPath())
                     var next = current
                     try {
                         next = freeze(mutate(current))
                         codec.validate(next)
-                        if ((write && next != current) || (file.exists() && codec.version(file) < 3)) {
+                        if ((write && next != current) || legacy) {
                             val staging = File(directory, "trips.pending")
-                            codec.write(staging, next)
-                            Files.move(staging.toPath(), file.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+                            val plaintext = codec.encode(next)
+                            val sealed = try { encryption.seal(plaintext) } finally { plaintext.fill(0) }
+                            try {
+                                FileOutputStream(staging).use { it.write(sealed); it.fd.sync() }
+                                // Authenticate and validate the complete staged file before replacement.
+                                val verified = encryption.open(readBounded(staging))
+                                try { verifyStore(codec.decode(verified) == next) } finally { verified.fill(0) }
+                                beforeAtomicReplace()
+                                Files.move(staging.toPath(), file.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+                            } finally {
+                                // A leftover from an interrupted process also contains only ciphertext.
+                                if (staging.isFile) Files.deleteIfExists(staging.toPath())
+                            }
                         }
                     } catch (error: Exception) {
                         mutableState.value = freeze(current)
@@ -206,16 +239,33 @@ class FileTripRepository(private val directory: File, private val mode: RuntimeM
                 }
             }
             StorageResult.Success(Unit)
+        } catch (error: StorageSecurityException) {
+            // Hide previously cached sensitive views on authentication/key failure. Do not reset disk.
+            mutableState.value = TripStorageState(error = error.error)
+            StorageResult.Failure(error.error)
         } catch (error: StoreException) {
-            if (!readSucceeded) mutableState.value = mutableState.value.copy(error = error.code)
+            if (migrating) mutableState.value = TripStorageState(error = error.code)
+            else if (!readSucceeded) mutableState.value = mutableState.value.copy(error = error.code)
             StorageResult.Failure(error.code)
         } catch (_: IOException) {
-            if (!readSucceeded) mutableState.value = mutableState.value.copy(error = StorageError.IO)
+            if (migrating) mutableState.value = TripStorageState(error = StorageError.IO)
+            else if (!readSucceeded) mutableState.value = mutableState.value.copy(error = StorageError.IO)
             StorageResult.Failure(StorageError.IO)
         } catch (_: java.nio.channels.OverlappingFileLockException) {
             StorageResult.Failure(StorageError.IO)
         }
     } }
+    private fun readBounded(inputFile: File): ByteArray = FileInputStream(inputFile).use { input ->
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            verifyStore(output.size() + count <= AesGcmEnvelope.MAX_ENVELOPE, StorageError.LIMIT_EXCEEDED)
+            output.write(buffer, 0, count)
+        }
+        output.toByteArray()
+    }
     private fun freeze(input: TripStorageState): TripStorageState {
         fun events(values: List<TripCareOccurrence>) = Collections.unmodifiableList(ArrayList(values))
         return input.copy(loaded = true, error = null,

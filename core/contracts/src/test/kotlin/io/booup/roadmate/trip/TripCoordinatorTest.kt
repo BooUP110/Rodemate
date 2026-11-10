@@ -1,5 +1,6 @@
 package io.booup.roadmate.trip
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import io.booup.roadmate.care.*
 import io.booup.roadmate.model.*
 import io.booup.roadmate.storage.FileTripRepository
@@ -15,7 +16,7 @@ class TripCoordinatorTest {
     private val clock = TestCareClock()
     private var serial = 0
     private fun coordinator(dir: File, mode: RuntimeMode = RuntimeMode.DEMO) = TripCoordinator(
-        FileTripRepository(dir, mode), mode, clock, TripIdSource { "trip-${++serial}" }, TripConfig(10, 20))
+        encryptedTestRepository(dir, mode), mode, clock, TripIdSource { "trip-${++serial}" }, TripConfig(10, 20))
     private fun context(t: Long, motion: MotionState = MotionState.STATIONARY, ux: UIMode = UIMode.PARKED) = frame(t).copy(
         motion = observed(motion, t), restrictions = observed(DrivingRestrictions(ux, 0, false), t)).context(t)
     private suspend fun finish(c: TripCoordinator) {

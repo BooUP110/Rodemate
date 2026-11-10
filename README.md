@@ -6,10 +6,12 @@
 
 | Production | Demo |
 |---|---|
-| 실제 하향등·누적 주행거리·앞좌석 왼쪽 공조 목표 온도 읽기 | SIMULATED 입력을 사용하는 케어 시나리오 |
+| 실제 하향등·누적 주행거리·앞좌석 왼쪽 공조 목표·외기 온도 읽기 | SIMULATED 입력을 사용하는 케어 시나리오 |
 | AAOS motion 기반 트립 시작·정차·재개·완료 | 하향등·온도·휴식·경고 표현과 상호작용 |
 | 명시 동의 후 앱 로컬 기록·복원·삭제 | 가상 지역 엽서·회고·시즌·보상 체험 |
 | 정차 후 기억 카드·선택 회고·무료 로컬 시즌 | DEMO 표기, 별도 앱 ID와 저장 경로 |
+| 정차 명시 온도 선호 안내·동의한 기억 회상/월간 사실 요약 | 실제 차량 adapter/permission 없이 기존 합성 경계 유지 |
+| Android Keystore/AES-GCM 저장 보호·기존 데이터 비파괴 전환 | 별도 UID/키/암호화 저장 |
 
 필수 입력이 검증되지 않은 자동 Care와 실제 지역 엽서 발급은 비활성입니다. 실제 경고 Care·음성·지도·위치·차량 제어·외부 LLM·서버·결제는 현재 제공하지 않습니다. 자세한 구분은 [MVP 범위](docs/MVP_SCOPE.md)에 있습니다.
 
@@ -23,6 +25,7 @@ Windows PowerShell, 프로젝트 루트에서:
 
 ~~~powershell
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:ANDROID_USER_HOME = "$env:USERPROFILE\.android"
 .\gradlew.bat --gradle-user-home .gradle-user-home --no-daemon '-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=COMPAT' '-Pandroid.overridePathCheck=true' :app:assembleDemoDebug :app:assembleProductionDebug
 ~~~
 
@@ -53,6 +56,6 @@ docs/                 실행·설계·범위·검수 문서
 
 운행/정책 상태를 확인할 수 없으면 정차 콘텐츠를 잠급니다. 실제 차량 제어 경로는 활성화하지 않았고, 사용자 수락도 차량 설정 변경 성공을 뜻하지 않습니다. 기록은 기본 비활성이고 별도 기억 저장에는 추가 동의와 항목 확인이 필요합니다. [안전·개인정보 안내](docs/SAFETY_AND_PRIVACY.md)를 확인하세요.
 
-최근 검증은 **492고유 테스트/516회, 실패·오류·skip0**, APK3종 빌드 성공입니다. 최종 offline/online lint는 각각 오류0·경고16입니다. 확대 접근성 검수는 PARTIAL이며 실차·심사 승인은 미확인입니다. 실행 범위와 제한은 [검증 요약](docs/VALIDATION_SUMMARY.md)에 기록했습니다.
+Phase8.6 검증은 **기존492개 보존 + 신규49개 = 541고유 테스트/565회, 실패·오류·skip0**, APK3종 빌드 성공입니다. Online lint는 오류0·경고16으로 증가가 없습니다. Offline에서 의존성 검사 생략으로 경고1만 나온 실행도 있으나 경고 해결로 세지 않습니다. 확대 접근성 검수는 PARTIAL이며 실차·심사 승인은 미확인입니다. 실제 AVD·저장 보안 결과와 한계는 [검증 요약](docs/VALIDATION_SUMMARY.md) 및 [Phase8.6 결과](docs/PHASE8_6_ENHANCED_LOCAL_PLATFORM_REPORT.md)에 기록했습니다.
 
 전체 문서는 [문서 안내](docs/README.md), 직접 확인은 [사용자 검수 안내](docs/USER_ACCEPTANCE_GUIDE.md)와 [시연 동선](docs/SUBMISSION_DEMO_FLOW.md)을 따릅니다. 최초 Git 등록과 제외 규칙 확인은 [저장소 관리 안내](CONTRIBUTING.md)에 있습니다.

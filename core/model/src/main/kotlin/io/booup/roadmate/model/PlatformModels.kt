@@ -20,10 +20,14 @@ data class DataMetadata(
     val permission: PermissionState,
     val quality: DataQuality,
     val observedAtMonotonicMillis: Long? = null,
+    val receivedAtMonotonicMillis: Long? = null,
+    val sourceTimestampNanos: Long? = null,
 ) {
     init {
         require(observedAtEpochMillis >= 0)
         require(observedAtMonotonicMillis == null || observedAtMonotonicMillis >= 0)
+        require(receivedAtMonotonicMillis == null || receivedAtMonotonicMillis >= 0)
+        require(sourceTimestampNanos == null || sourceTimestampNanos >= 0)
     }
 }
 
@@ -47,7 +51,7 @@ data class VehicleSnapshot(
     val telltaleIdentifiers: Reading<List<String>>,
     val currentTripDistanceMeters: Reading<Long> = Reading.Unavailable(UnavailableReason.NOT_REQUESTED),
     val driverPresent: Reading<Boolean> = Reading.Unavailable(UnavailableReason.NOT_REQUESTED),
-    // An external/demo context slot, never inferred from an unverified HVAC 'current' value.
+    // Vehicle outside sensor (SYSTEM) or explicit Demo, never weather or HVAC 'current'.
     val outsideTemperatureCelsius: Reading<Double> = Reading.Unavailable(UnavailableReason.NOT_REQUESTED),
     // Cumulative odometer observation; never a TripTracker distance counter.
     val totalOdometerKilometers: Reading<Double> = Reading.Unavailable(UnavailableReason.NOT_REQUESTED),

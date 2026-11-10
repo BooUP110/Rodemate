@@ -16,6 +16,7 @@ class PleosVehicleAdapter(
     private val log: (String) -> Unit = {},
     private val restrictionAdapter: DrivingRestrictionAdapter? = null,
     private val motionAdapter: io.booup.roadmate.contracts.MotionAdapter? = null,
+    private val outsideAdapter: io.booup.roadmate.contracts.OutsideTemperatureAdapter? = null,
 ) : VehicleAdapter {
     override val source = DataSource.VEHICLE_SDK
     private val mutableFrames = MutableStateFlow(VehicleFrame())
@@ -27,6 +28,7 @@ class PleosVehicleAdapter(
     private var polling: Job? = null
     private var restrictionJob: Job? = null
     private var motionJob: Job? = null
+    private var outsideJob: Job? = null
 
     override suspend fun connect(): AdapterResult<Unit> {
         val token = synchronized(lock) {
@@ -106,7 +108,7 @@ class PleosVehicleAdapter(
                 override fun failure(property: String, exception: Exception, reason: UnavailableReason) = receive(token) {
                     val frame = mutableFrames.value
                     val disconnected = reason == UnavailableReason.DISCONNECTED || property == "session"
-                    if (disconnected) { transportFailed = true; polling?.cancel(); restrictionJob?.cancel(); motionJob?.cancel() }
+                    if (disconnected) { transportFailed = true; polling?.cancel(); restrictionJob?.cancel(); motionJob?.cancel(); outsideJob?.cancel() }
                     publish((if (disconnected) frame.invalidate(reason) else unavailable(frame, property, reason)).copy(
                         connection = ConnectionState(if (disconnected) ConnectionStatus.FAILED else ConnectionStatus.DEGRADED, reason)))
                     log("failure property=$property type=${exception.javaClass.name} message=${exception.message} mapped=$reason")
@@ -133,6 +135,14 @@ class PleosVehicleAdapter(
                 }
                 sourceAdapter.connect()
             }
+            outsideAdapter?.let { sourceAdapter ->
+                outsideJob=scope.launch {
+                    sourceAdapter.readings.collect { reading -> receive(token) {
+                        publish(mutableFrames.value.copy(vehicle=mutableFrames.value.vehicle.copy(outsideTemperatureCelsius=reading)))
+                    } }
+                }
+                sourceAdapter.connect()
+            }
             polling = scope.launch { while (isActive) { delay(config.refreshMillis); next.refresh() } }
             AdapterResult.Available(Unit) // Session started; connection stays CONNECTING until a real response.
         } catch (e: Exception) {
@@ -152,13 +162,16 @@ class PleosVehicleAdapter(
             polling?.cancel(); polling = null
             restrictionJob?.cancel(); restrictionJob = null
             motionJob?.cancel(); motionJob = null
+            outsideJob?.cancel(); outsideJob=null
             val old = session; session = null
             publish(mutableFrames.value.invalidate(UnavailableReason.DISCONNECTED).copy(
                 connection = ConnectionState(ConnectionStatus.DISCONNECTED, UnavailableReason.DISCONNECTED)))
             old
         }
         try { previous?.close() } finally {
-            try { restrictionAdapter?.disconnect() } finally { motionAdapter?.disconnect() }
+            try { restrictionAdapter?.disconnect() } finally {
+                try { motionAdapter?.disconnect() } finally { outsideAdapter?.disconnect() }
+            }
         }
         log("session released")
     }

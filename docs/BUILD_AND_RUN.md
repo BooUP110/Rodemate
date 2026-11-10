@@ -21,6 +21,7 @@ Windows PowerShell, 프로젝트 루트 기준:
 
 ~~~powershell
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:ANDROID_USER_HOME = "$env:USERPROFILE\.android"
 .\gradlew.bat --gradle-user-home .gradle-user-home --version
 
 # 모델/엔진/저장소: Android SDK 없이 검증
@@ -61,3 +62,7 @@ Production과 Demo는 앱 서랍에서도 구분해 실행할 수 있다. instal
 http://127.0.0.1:8088/ 을 브라우저로 열고 활성 상태로 유지한다. Console은 AVD 시험 입력 도구이며 앱의 차량 제어 기능이 아니다. 상세 절차는 [시연 동선](SUBMISSION_DEMO_FLOW.md)을 따른다.
 
 tools/ui-probe는 제품 APK와 독립된 testOnly UI 관측 도구다. 필요한 경우 위 Gradle 공통 옵션에 -Pphase8UiProbe :ui-probe:assembleDebug를 추가해 빌드한다. 일반 빌드와 사용자 직접 검수에는 필요하지 않으며 제품에 의존성으로 포함되지 않는다. 원시 자동 수집 기록은 저장소에서 배포하지 않는다.
+
+Phase8.6의 삭제/회고 자동 검증에는 `-Pphase86IsolatedAcceptance :app:assembleProductionDebug :app:assembleProductionDebugAndroidTest`로 별도 검증 APK를 만들었다. 같은 Production 소스를 쓰되 앱 ID는 `io.booup.roadmate.acceptance`, 출력은 `app/build/phase86-acceptance/`이며 UID·데이터·Keystore를 원래 앱과 분리한다. 이 옵션에서는 release가 비활성이다. 일반 Production 산출물을 대체하지 않으며 사용자는 기본 Production 앱으로 검수한다. 별도 계측 APK의 `Phase86Instrumentation`은 보안 fixture/현재 파일의 count-only 확인/외기 연결 검증을 수행하고 제품 APK에는 포함되지 않는다. 과거 `ClosureInstrumentation`은 이번 실행에서 사용하지 않았다.
+
+Keystore 키가 없거나 암호문 인증에 실패하면 기존 파일을 자동 초기화하지 않는다. 재설치/데이터 지우기로 해결하려 하지 말고 [저장 보안](PHASE8_6_STORAGE_SECURITY.md)과 [migration](PHASE8_6_STORAGE_MIGRATION.md)을 먼저 확인한다. 단말의 전체 앱 데이터/키 삭제나 복구는 이번 자동 검증에 포함되지 않는다.

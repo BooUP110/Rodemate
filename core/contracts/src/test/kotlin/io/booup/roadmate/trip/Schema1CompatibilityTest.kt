@@ -1,5 +1,6 @@
 package io.booup.roadmate.trip
 
+import io.booup.roadmate.testing.encryptedTestRepository
 import io.booup.roadmate.model.*
 import io.booup.roadmate.storage.FileTripRepository
 import kotlinx.coroutines.runBlocking
@@ -16,7 +17,7 @@ class Schema1CompatibilityTest {
         val dir = temporary.newFolder()
         val bytes = javaClass.getResourceAsStream("/schema1-golden.bin")!!.use { it.readBytes() }
         File(dir, "trips.v1.bin").writeBytes(bytes)
-        val r = FileTripRepository(dir, RuntimeMode.DEMO); success(r.load())
+        val r = encryptedTestRepository(dir, RuntimeMode.DEMO); success(r.load())
         val s = r.state.value
         assertEquals("legacy-trip", s.trips.single().tripId)
         assertEquals("legacy-active", s.active!!.tripId)
@@ -24,7 +25,7 @@ class Schema1CompatibilityTest {
         assertTrue(s.consents[ConsentScope.EMOTIONAL_MEMORY]!!.granted)
         assertEquals("Original confirmed memory", s.memories.single().text)
         assertTrue(s.postDrive.isEmpty()); assertTrue(s.visits.isEmpty()); assertTrue(s.postcards.isEmpty())
-        DataInputStream(File(dir,"trips.v1.bin").inputStream()).use { it.readUTF(); assertEquals(3,it.readInt()) }
-        val reopened=FileTripRepository(dir,RuntimeMode.DEMO); success(reopened.load()); assertEquals(s,reopened.state.value)
+        DataInputStream(io.booup.roadmate.testing.testPlaintext(File(dir,"trips.v1.bin"),RuntimeMode.DEMO).inputStream()).use { it.readUTF(); assertEquals(4,it.readInt()) }
+        val reopened=encryptedTestRepository(dir,RuntimeMode.DEMO); success(reopened.load()); assertEquals(s,reopened.state.value)
     }
 }

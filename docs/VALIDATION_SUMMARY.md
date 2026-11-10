@@ -1,22 +1,30 @@
 # 검증 요약
 
-기준일: 2026-11-09. 아래 수치는 최근 구현 검증 시 실제 실행한 결과다. 문서 정리 자체로 앱 기능이나 승인 상태가 바뀌지 않으며 **USER_ACCEPTANCE_PENDING / 제출 준비 NOT YET**다. 원시 개발 로그/환경별 수집 자료는 공개 저장소에 포함하지 않는다.
+기준일: 2026-11-10, Phase8.6. 아래 수치는 실제 실행 결과이며 **PHASE8_6_IMPLEMENTATION_COMPLETE / USER_ACCEPTANCE_PENDING / 제출 준비 NOT YET**다. 원시 개발 로그/환경별 수집 자료는 공개 저장소에 포함하지 않는다. [전체 결과](PHASE8_6_ENHANCED_LOCAL_PLATFORM_REPORT.md)와 [검증 JSON](verification/phase8-6-artifacts.json)에 실행별 근거를 기록했다.
 
 ## 빌드와 회귀
 
 | 항목 | 결과 |
 |---|---|
-| JVM 테스트 | 기존484고유 보존 + 신규 UI8 = 492고유 / 516회 |
-| 모듈별 실행 | model30 / contracts336 / Demo100 / Production50 |
+| JVM 테스트 | 기존492고유 전부 보존 + 신규49 = 541고유 / 565회 |
+| 모듈별 실행 | model30 / contracts375 / Demo100 / Production60 |
 | failure / error / skip | 0 / 0 / 0 |
 | APK | Demo debug·Production debug·Production release unsigned 빌드 성공 |
-| 최종 lint offline | Error/Fatal0, Warning16 |
+| 최종 lint offline | Error/Fatal0, Warning16, Information0; 이전 online 분석 캐시와 같은 경고 |
 | 최종 lint online | Error/Fatal0, Warning16 |
 | 남은 경고 | DataExtractionRules1, GradleDependency12, AndroidGradlePluginVersion3 |
 
-아이콘 누락은 수정했다. 백업/이전 정책과 의존성·AGP 버전 경고는 해결하지 않았으며 offline 모드가 경고 해결을 의미하지 않는다. 재실행 명령은 [빌드 및 실행](BUILD_AND_RUN.md)에 있다.
+Online Warning16은 기존 대비 증가0이며 DataExtractionRules1·GradleDependency12·AndroidGradlePluginVersion3을 유지한다. 앞선 offline 실행에서는 버전 검사 생략으로 Warning1만 나왔으며15개 해결로 세지 않는다. 최종 offline은 online 분석 캐시와 같은16개다. 새 Compose 상태의 AutoboxingStateCreation Information1은 mutableDoubleStateOf로 실제 수정했다. 기존 아이콘 수정도 유지한다. 백업/이전 정책과 의존성·AGP 버전 경고를 숨기거나 baseline/ignore로 제거하지 않았다. API34용 registerCallback 등의 compileSdk35 deprecation 컴파일 경고는 lint 집계와 별도다. 재실행 명령은 [빌드 및 실행](BUILD_AND_RUN.md)에 있다.
 
 ## 실제 AVD 확인
+
+Phase8.6에서는 실제 Android Keystore fixture/기존 평문 파일 migration/force-stop reopen, SYSTEM 외기 GET·callback·reconnect와 정차 선호/회상/삭제 UI를 확인했다. 원래 앱 데이터는 보존했고, 삭제·회고 UI는 같은 Production 소스를 별도 UID로 빌드한 검증 앱에서 수행했다. 실제10/120초로 만든 Trip에 고정 테스트 문구를 입력해 암호문 평문 부재, 재시작 후 명시 기억 열기, 삭제 후 집계0·무복원을 확인했다.
+
+P8.6-01~14 검증은 통과했다. P8.6-10 차량 write 부재는 read-only 호출/배선 감사로 확인했으며 VHAL 쓰기 카운터를 실측한 것은 아니다. P8.6-09는 실제 Drive1km/h의 UX 제한이며 moving/unknown/stale는 추가 JVM 검증이다. P8.6-14는 cold process restart이고 이번 Phase가 새 전체 AVD coldboot 인증을 부여하지 않는다. 테스트 중 종료된 AVD는 no-wipe/no-snapshot-load로 다시 부팅하고 기존 테스트 Trip을 유지했다.
+
+최초 외기 계측의 Console 비활성 timeout, 부팅 서비스 준비 전 activity 해석 실패, 실제 UI 입력 중 늦은 speed GET으로 UNKNOWN이 된 실패를 보존했다. Console 활성·부팅 완료를 확인했고, 마지막 문제는 최신 sample보다 오래된 GET을 버리도록 고쳤다. 정책·freshness·UNKNOWN 잠금 기준을 완화하지 않았다.
+
+아래는 **이전 Phase8에서 실행한 범위**이며 이번에 모든 시나리오를 다시 실행했다고 주장하지 않는다.
 
 Pleos Connect2.1.0/API34, 2560×1440/density160에서 Production15개 UI 시나리오와 조건부 콜드 부팅1개, Demo8개를 실행했다.
 

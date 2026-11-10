@@ -8,6 +8,16 @@ import java.util.Locale
 
 /** Copy only; never changes health, motion or eligibility semantics. */
 object UiCopy {
+    fun storageError(error:StorageError)=when(error) {
+        StorageError.KEY_MISSING,StorageError.KEY_INVALIDATED -> "이 기기의 보안 키로 기록을 열 수 없어요. 기존 기록 파일은 보존하고 있어요."
+        StorageError.AUTHENTICATION_FAILED -> "저장된 기록의 무결성을 확인하지 못했어요. 기존 파일은 덮어쓰지 않았어요."
+        StorageError.ENCRYPTION_UNAVAILABLE -> "기록 보호 기능을 사용할 수 없어 저장을 중단했어요."
+        StorageError.CONSENT_REQUIRED -> "기록 저장 동의와 별도 확인이 필요해요."
+        StorageError.NOT_FOUND -> "기록이 삭제되었거나 변경됐어요."
+        else -> "저장을 완료하지 못했어요. 기존 기록은 임의로 지우지 않았어요."
+    }
+    fun temperatureReading(reading:EvaluatedReading<Double>):String=reading.currentValue?.let(::temperature)
+        ?: if(reading.freshness in setOf(Freshness.STALE,Freshness.EXPIRED)) "정보가 오래되어 다시 확인 중이에요" else unavailable(reading.availability)
     fun connection(status: ConnectionStatus) = when (status) {
         ConnectionStatus.CONNECTED -> "차량 정보 연결됨"
         ConnectionStatus.DEGRADED -> "일부 정보 확인 중"

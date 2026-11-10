@@ -134,7 +134,7 @@ private fun HomeContent(context: VehicleContext, trip: TripUiState, care: CareUi
     }
     if (!canBrowse) RoadmateCard {
         Text("기억과 시즌은 정차 후에", style = MaterialTheme.typography.titleMedium)
-        Text(if (trip.storage.error != null) "저장 정보를 읽지 못했어요. 기존 기록을 지우지 않았어요."
+        Text(if (trip.storage.error != null) UiCopy.storageError(requireNotNull(trip.storage.error))
             else if (!trip.storage.loaded) "이 기기의 기록을 불러오고 있어요."
             else "정차 상태와 화면 사용 가능 여부를 확인하면 기록·회고·시즌을 열 수 있어요.", style = MaterialTheme.typography.bodyMedium)
     }
@@ -148,6 +148,7 @@ private fun HomeContent(context: VehicleContext, trip: TripUiState, care: CareUi
                 ?: UiCopy.unavailable(context.totalOdometerKilometers.availability)), style = MaterialTheme.typography.bodyMedium)
             Text("앞좌석 왼쪽 공조 설정  " + (context.frontLeftTargetTemperatureCelsius.currentValue?.let(UiCopy::temperature)
                 ?: UiCopy.unavailable(context.frontLeftTargetTemperatureCelsius.availability)), style = MaterialTheme.typography.bodyMedium)
+            Text("외기 온도 · 차량 센서  "+UiCopy.temperatureReading(context.outsideTemperatureCelsius),style=MaterialTheme.typography.bodyMedium)
             Text("일부 케어 안내는 필요한 차량 정보가 확인되면 이용할 수 있어요. 현재는 자동 안내를 제공하지 않아요.",
                 style = MaterialTheme.typography.bodyMedium)
         }

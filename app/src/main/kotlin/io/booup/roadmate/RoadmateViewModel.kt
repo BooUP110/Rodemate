@@ -23,6 +23,12 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     val postDriveUiState = postDrive?.uiState ?: MutableStateFlow(PostDriveUiState()).asStateFlow()
     val progress=binding.progress
     val progressUiState=progress?.uiState ?: MutableStateFlow(ProgressUiState()).asStateFlow()
+    val comfort=binding.comfort
+    val comfortUiState=comfort?.uiState ?: MutableStateFlow(ComfortUiState()).asStateFlow()
+    private val mutableRecall=MutableStateFlow(MemoryRecallState())
+    val recallUiState=mutableRecall.asStateFlow()
+    private var openedMemoryId:String?=null
+    private var openedMemoryGeneration=-1L
     private val interaction = binding.clock?.let { CareInteractionRuntime(it, simulationFeedback = binding.simulationFeedback) }
     val uiState = interaction?.uiState ?: MutableStateFlow(CareUiState()).asStateFlow()
     val interactionRecords = interaction?.records ?: MutableStateFlow<Map<String, InteractionRecord>>(emptyMap()).asStateFlow()
@@ -31,6 +37,8 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     private val mutableCareDecision = MutableStateFlow(CareDecision())
     val careDecision = mutableCareDecision.asStateFlow()
     init {
+        viewModelScope.launch { state.collect { refreshLocalExperience() } }
+        trips?.let { trip -> viewModelScope.launch { trip.repository.state.collect { refreshLocalExperience() } } }
         trips?.let { trip -> viewModelScope.launch { trip.initialize(); progress?.initialize() } }
         progress?.let { engine -> viewModelScope.launch { engine.repository.state.collect { if(it.loaded) engine.refresh() } } }
         postDrive?.let { post -> viewModelScope.launch { tripUiState.collect { post.refresh() } } }
@@ -45,6 +53,7 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
         }
     }
     private fun refreshPresentation() {
+        refreshLocalExperience()
         val decision = binding.careEngine?.evaluate(state.value) ?: CareDecision()
         mutableCareDecision.value = decision
         binding.onCareDecision?.invoke(decision)
@@ -52,6 +61,21 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
         postDrive?.let { post -> viewModelScope.launch { post.refresh() } }
         progress?.let { engine -> viewModelScope.launch { engine.refresh() } }
     }
+    private fun refreshLocalExperience() {
+        val clock=binding.clock ?: return
+        val store=trips?.repository?.state?.value ?: return
+        if(openedMemoryGeneration!=store.captureGeneration) openedMemoryId=null
+        val projected=io.booup.roadmate.local.MemoryRecallProjector().project(store,state.value,clock.now(),openedMemoryId)
+        if(projected.openedMemoryId==null) openedMemoryId=null
+        mutableRecall.value=projected
+        comfort?.let { viewModelScope.launch { it.refresh() } }
+    }
+    fun openRecall(memoryId:String) {
+        openedMemoryGeneration=trips?.repository?.state?.value?.captureGeneration ?: -1
+        openedMemoryId=memoryId; refreshLocalExperience()
+    }
+    fun closeRecall() { openedMemoryId=null; refreshLocalExperience() }
+    fun comfortAction(action:suspend (io.booup.roadmate.local.ComfortCoordinator)->Unit)=viewModelScope.launch { comfort?.let { action(it) } }
     fun foreground() = viewModelScope.launch {
         visible = true
         binding.repository.foreground()
