@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <application android:allowBackup="false" android:testOnly="true" android:label="Roadmate 검증 도구" />
+    <instrumentation android:name=".Phase8UiProbe" android:targetPackage="io.booup.roadmate.uiprobe"
+        android:functionalTest="true" />
+    <instrumentation android:name=".NaviLocationProbe" android:targetPackage="io.booup.roadmate.uiprobe"
+        android:functionalTest="true" />
+</manifest>

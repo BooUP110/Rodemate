@@ -19,7 +19,7 @@
 
 ## 빠른 시작
 
-검증 환경은 JDK21.0.4, Android SDK35/build-tools35.0.1, Gradle Wrapper8.10.2입니다. 실행 대상은 Pleos Connect2.1.0/API34 AVD이며 minSdk28, compile/targetSdk35입니다.
+검증 환경은 JDK21.0.4, Android SDK35/build-tools35.0.1, Gradle Wrapper8.13입니다. 실행 대상은 Pleos Connect2.1.0/API34 AVD이며 minSdk28, compile/targetSdk35입니다.
 
 Windows PowerShell, 프로젝트 루트에서:
 

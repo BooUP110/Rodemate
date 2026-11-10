@@ -1,0 +1,113 @@
+package io.booup.roadmate
+
+import io.booup.roadmate.model.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.*
+import org.junit.Test
+import kotlin.random.Random
+
+class JourneyGameTest {
+    @Test fun ticketsChoicesAndConcurrentDrawsUnlockEachPassOnlyOnce() = runBlocking {
+        val fixture = Fixture()
+        val game = fixture.create()
+        assertNull(game.draw())
+        fixture.parked = true
+        fixture.writable = false
+        assertNull(game.draw())
+        assertEquals(1, game.tickets(game.state.value))
+        fixture.writable = true
+        val first = listOf(async { game.draw() }, async { game.draw() }).awaitAll().filterNotNull().single()
+        assertFalse(game.choose(first))
+
+        val coast = coastalPlaces.first()
+        fixture.addCard(coast)
+        assertTrue(game.openCard(coast.id))
+        assertTrue(game.star(coast.id))
+        assertFalse(game.star(coast.id))
+        assertTrue(game.hasLine(game.stamps(game.state.value)))
+        val selected = game.candidates(game.state.value).first()
+        assertTrue(game.choose(selected))
+        assertFalse(game.choose(game.candidates(game.state.value).single()))
+
+        fixture.addCard(coastalPlaces.last())
+        val remaining = game.candidates(game.state.value).single()
+        assertEquals(remaining, game.draw())
+        assertNull(game.draw())
+        assertEquals(setOf(first, selected, remaining), fixture.create().state.value.grants.map { it.pass }.toSet())
+    }
+
+    @Test fun sharedLevelAndPremiumControlFinalClaimAndACompletedTripUnlocksMemory() = runBlocking {
+        val fixture = Fixture().apply { parked = true }
+        val game = fixture.create()
+        val pass = requireNotNull(game.draw())
+        val companion = pass.companionIds().first()
+        assertFalse(game.claim(pass, 3, true, companion))
+        assertFalse(game.equip(companion))
+        fixture.level = 5
+        assertTrue(game.claim(pass, 2, true))
+        assertTrue(game.claim(pass, 3, true, companion))
+        assertFalse(game.claim(pass, 3, true, companion))
+        assertTrue(game.equip(companion))
+        assertFalse(game.remember(journeyPlaces.first(), "new-trip"))
+        fixture.trip = fixture.trip.copy(trips = listOf(TripRecord("new-trip", TripState.COMPLETED, 101, 120,
+            DataSource.SIMULATED, 19, 12, completionReason = TripCompletionReason.CONFIRMED_STATIONARY,
+            quality = TripDataQuality.COMPLETE, createdAtEpochMillis = 120)))
+        assertTrue(game.remember(journeyPlaces.first(), "new-trip"))
+        assertFalse(game.remember(journeyPlaces.first(), "new-trip"))
+        assertEquals(companion, fixture.create().state.value.memories.single().companion)
+    }
+
+    private class Fixture {
+        var trip = TripStorageState(loaded = true, consents = mapOf(ConsentScope.TRIP_HISTORY to
+            ConsentRecord(ConsentScope.TRIP_HISTORY, true, 1, null, DataSource.SIMULATED, "test")))
+        var parked = false
+        var writable = true
+        var level = 1
+        var saved = JourneyGameState()
+        private val season = Season(JOURNEY_SEASON_ID, "여행", 1, 1000,
+            listOf(0, 15, 30, 45, 60), emptyList(), emptyList())
+        fun create() = JourneyGame({ trip }, {
+            ProgressUiState(active = SeasonView(season, SeasonProgress(season.seasonId, emptySet(), currentLevel = level),
+                null, false, emptyList(), emptyList()))
+        }, { parked }, { 100 }, saved, { updated -> writable.also { if (it) saved = updated } }, Random(7))
+
+        fun addCard(place: JourneyPlace) {
+            val calendar = CalendarAttributes(CalendarSeason.AUTUMN, CalendarTimeOfDay.DAY, "UTC")
+            trip = trip.copy(postcards = trip.postcards + Postcard(PostcardKey(place.id), place.name,
+                null, false, 20, calendar, RegionEvidenceSource.DEMO))
+        }
+    }
+
+    @Test fun deletedTripsAndRevokedConsentRemoveJourneyMemoriesWithoutLosingPasses() = runBlocking {
+        val fixture = Fixture().apply { parked = true }
+        val memory = JourneyMemory("deleted-trip", "region", CompanionProfiles.dodam.id)
+        fixture.saved = JourneyGameState(grants = listOf(PassGrant(JourneyPass.TRAVEL, true)), memories = listOf(memory))
+        val game = fixture.create()
+        assertTrue(game.visibleMemories().isEmpty())
+        assertTrue(game.reconcileStorage())
+        assertTrue(game.state.value.memories.isEmpty())
+        assertEquals(1, game.state.value.grants.size)
+        fixture.trip = fixture.trip.copy(trips = listOf(TripRecord("deleted-trip", TripState.COMPLETED, 101, 120,
+            DataSource.SIMULATED, 19, 12, completionReason = TripCompletionReason.CONFIRMED_STATIONARY,
+            quality = TripDataQuality.COMPLETE, createdAtEpochMillis = 120)), consents = emptyMap())
+        fixture.saved = fixture.saved.copy(memories = listOf(memory))
+        val reopened = fixture.create()
+        assertTrue(reopened.reconcileStorage())
+        assertTrue(reopened.state.value.memories.isEmpty())
+        fixture.trip = fixture.trip.copy(progression = fixture.trip.progression.copy(resetAtEpochMillis = 200))
+        assertTrue(reopened.reconcileStorage())
+        assertTrue(reopened.state.value.grants.isEmpty())
+    }
+
+    @Test fun legacyGameAdoptsExistingResetMarkerWithoutDeletingEarnedPasses() = runBlocking {
+        val fixture = Fixture().apply { parked = true }
+        fixture.trip = fixture.trip.copy(progression = fixture.trip.progression.copy(resetAtEpochMillis = 200))
+        fixture.saved = JourneyGameState(grants = listOf(PassGrant(JourneyPass.TRAVEL, true)))
+        val game = fixture.create()
+        assertTrue(game.reconcileStorage())
+        assertEquals(200L, game.state.value.progressResetAt)
+        assertEquals(listOf(PassGrant(JourneyPass.TRAVEL, true)), game.state.value.grants)
+    }
+}

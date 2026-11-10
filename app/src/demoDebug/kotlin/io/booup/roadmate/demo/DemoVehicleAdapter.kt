@@ -28,9 +28,21 @@ class DemoVehicleAdapter(private val clock: ContextClock) : VehicleAdapter {
     private val mutableProgressSelection=MutableStateFlow<ProgressDemoId?>(null)
     val progressSelection=mutableProgressSelection.asStateFlow()
     private var progressStartedAt=0L
+    private var journeyStartedAt: Long? = null
+
+    fun startJourneyTrip() {
+        select(DemoScenarioId.A_NORMAL)
+        journeyStartedAt = clock.now().monotonicMillis
+        sampleCare()
+    }
+
+    fun finishJourneyTrip() {
+        if (journeyStartedAt != null) select(DemoScenarioId.A_NORMAL)
+    }
 
     /** A selection is an explicit NEW demo observation, including when replaying the same case. */
     fun select(id: DemoScenarioId) {
+        journeyStartedAt = null
         mutableProgressSelection.value=null
         mutablePostDriveSelection.value = null
         mutableTripSelection.value = null
@@ -81,6 +93,17 @@ class DemoVehicleAdapter(private val clock: ContextClock) : VehicleAdapter {
     }
     /** A real new SIMULATED sample, not a re-stamp of received vehicle data. */
     fun sampleCare() {
+        journeyStartedAt?.let { started ->
+            val now = clock.now()
+            val frame = TripDemoScenarios.frame(TripDemoScenarioId.T1_NORMAL_TRIP,
+                now.monotonicMillis - started, now, mutableFrames.value.sequence + 1)
+            val motion = frame.motion as? Reading.Observed
+            mutableFrames.value = if (motion?.value == MotionState.MOVING) {
+                frame.copy(restrictions = Reading.Observed(DrivingRestrictions(UIMode.RESTRICTED, null, true, now.epochMillis),
+                    motion.metadata))
+            } else frame
+            return
+        }
         mutableProgressSelection.value?.let { id ->
             val now=clock.now(); mutableFrames.value=ProgressDemoScenarios.frame(id,(now.monotonicMillis-progressStartedAt).coerceAtLeast(0),now,mutableFrames.value.sequence+1); return
         }
@@ -102,6 +125,11 @@ class DemoVehicleAdapter(private val clock: ContextClock) : VehicleAdapter {
         }
         mutableCareSelection.value?.let { id ->
             mutableFrames.value = CareDemoScenarios.frame(id, clock.now(), mutableFrames.value.sequence + 1)
+            return
+        }
+        mutableSelection.value?.let { id ->
+            val scenario = DemoScenarios.all.single { it.id == id }
+            mutableFrames.value = DemoScenarios.frame(scenario, clock.now(), mutableFrames.value.sequence + 1)
         }
     }
 

@@ -4,6 +4,10 @@
 
 ## 책임과 형식
 
+wkdal 통합 후 Demo 게임 진행·획득한 팩·동반자 여행 연결 정보도 `EncryptedJourneyGameStore`에서 같은 AES-GCM envelope 형식으로 보호한다. aggregate와 별도 Demo 키 namespace를 사용하며, 암호문 staging·fsync·atomic replace 후 성공으로 처리한다. 기존 평문 SharedPreferences는 암호화 이행 성공 후 제거한다. 읽기/인증/키 실패 시 기존 파일을 보존하고 쓰기를 차단한다.
+
+게임의 여행 연결 정보는 회고 원문이나 별도 감정 기억이 아니며, Trip 기록 동의를 요구한다. 원본 Trip 삭제·기록 동의 철회 시 연결 정보를 제거하고, 시즌 진행 초기화 시 게임 진행도 함께 초기화한다. 엽서 자체는 기존 컬렉션 보존 정책을 따른다. Production에는 게임 저장 구현과 콜라보 자료 공급자를 넣지 않는다.
+
 | 계층 | 책임 |
 |---|---|
 | `app/.../security/AndroidStoreKeys.kt` | AndroidKeyStore에서 키 생성/재사용. 키 재료·alias·예외 원문을 로그로 출력하지 않음 |

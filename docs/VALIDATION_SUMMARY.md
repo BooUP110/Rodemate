@@ -1,5 +1,7 @@
 # 검증 요약
 
+`main` + `wkdal1433` 병합 후 재검증은 [통합 검토 기록](MERGE_PHASE86_WKDAL.md)에 별도로 기록한다. 아래 Phase 결과를 통합 결과로 재사용하지 않는다.
+
 기준일: 2026-11-10, Phase8.6. 아래 수치는 실제 실행 결과이며 **PHASE8_6_IMPLEMENTATION_COMPLETE / USER_ACCEPTANCE_PENDING / 제출 준비 NOT YET**다. 원시 개발 로그/환경별 수집 자료는 공개 저장소에 포함하지 않는다. [전체 결과](PHASE8_6_ENHANCED_LOCAL_PLATFORM_REPORT.md)와 [검증 JSON](verification/phase8-6-artifacts.json)에 실행별 근거를 기록했다.
 
 ## 빌드와 회귀

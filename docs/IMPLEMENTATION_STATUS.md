@@ -1,5 +1,7 @@
 # 현재 구현 상태
 
+`main` Phase8.6과 `wkdal1433`의 통합 변경은 [통합 검토 기록](MERGE_PHASE86_WKDAL.md)을 따른다. 아래 표와 수치는 병합 전 Phase8.6 기준이며, 통합 검증과 구분한다.
+
 기준: Phase8.6, 2026-11-10. 범위는 R27/R02/R03/R25 네 영역이다. **USER_ACCEPTANCE_PENDING**, 접근성 확대 검수 **PARTIAL**, 제출 준비 **NOT YET**를 유지한다. 이전 Phase 보고서는 로컬 개발 보관소에 보존한다.
 
 | 범위 | 실제 구현 | 검증 / 제한 |

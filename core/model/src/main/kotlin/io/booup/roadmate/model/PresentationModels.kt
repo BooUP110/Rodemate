@@ -5,7 +5,7 @@ import java.util.Collections
 enum class CompanionTone { CALM, WARM }
 enum class CompanionExpression { NEUTRAL, HAPPY, CONCERNED, LISTENING, CONFIRMING, SERIOUS_FIXED }
 
-/** Original working names and text initials only. No rules, permissions, safety text or actions. */
+/** Visual identity and tone only. No rules, permissions, safety text or actions. */
 data class CompanionProfile(val id: CompanionId, val displayName: String, val initials: String, val tone: CompanionTone)
 object CompanionProfiles {
     val dodam = CompanionProfile(CompanionId("original_dodam"), "도담 (가칭)", "도", CompanionTone.CALM)

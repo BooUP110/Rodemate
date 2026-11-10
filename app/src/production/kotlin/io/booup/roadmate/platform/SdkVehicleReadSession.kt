@@ -13,9 +13,17 @@ import ai.pleos.playground.vehicle.constant.area.SeatValue
 import ai.pleos.playground.vehicle.constant.unit.TemperatureUnit
 import ai.pleos.playground.vehicle.api.model.capability.AccessType
 import ai.pleos.playground.vehicle.constant.control.LightState
+import ai.pleos.playground.vehicle.constant.telltale.TelltaleState
 import ai.pleos.playground.vehicle.listener.LightStateListener
 import ai.pleos.playground.vehicle.listener.DistanceDrivenListener
 import io.booup.roadmate.model.LowBeamState
+import io.booup.roadmate.model.AdapterResult
+import io.booup.roadmate.model.UnavailableReason
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 
 /** API shapes and CAR_LIGHTS annotations verified against Vehicle-2.3.2.aar. No setters. */
 class SdkVehicleReadSession(context: Context) : VehicleReadSession {
@@ -145,6 +153,32 @@ class SdkVehicleReadSession(context: Context) : VehicleReadSession {
     }
     private fun fail(property: String, exception: Exception) = onMain {
         if (active) observer?.failure(property, exception, SdkErrorMapping.reason(exception))
+    }
+    override suspend fun readTelltales(): AdapterResult<List<String>> = withContext(Dispatchers.Main.immediate) {
+        val domain = safety?.takeIf { active } ?: return@withContext AdapterResult.Unavailable(UnavailableReason.NOT_CONNECTED)
+        withTimeoutOrNull(4_000) {
+            suspendCancellableCoroutine<AdapterResult<List<String>>> { response ->
+                try {
+                    domain.getTelltalesInfo(onComplete = { value -> onMain {
+                        if (response.isActive) {
+                            val lights = value?.telltales?.mapNotNull { light ->
+                                when (light.state) {
+                                    TelltaleState.ON -> "${light.type.name} · 켜짐"
+                                    TelltaleState.BLINK -> "${light.type.name} · 점멸"
+                                    else -> null
+                                }
+                            }?.distinct()
+                            response.resume(lights?.let { AdapterResult.Available(it) }
+                                ?: AdapterResult.Unavailable(UnavailableReason.NO_VALUE))
+                        }
+                    } }, onFailed = { error -> onMain {
+                        if (response.isActive) response.resume(AdapterResult.Unavailable(SdkErrorMapping.reason(error)))
+                    } })
+                } catch (error: Exception) {
+                    if (response.isActive) response.resume(AdapterResult.Unavailable(SdkErrorMapping.reason(error)))
+                }
+            }
+        } ?: AdapterResult.Unavailable(UnavailableReason.SDK_ERROR)
     }
     override fun close() = onMain {
         active = false

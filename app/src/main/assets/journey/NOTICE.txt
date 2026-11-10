@@ -1,0 +1,11 @@
+Republic of Korea administrative districts (2020), KOR ADM2.
+Source and attribution: geoBoundaries and citypopulation.de.
+Metadata: https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM2/
+Geometry: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/KOR/ADM2/geoBoundaries-KOR-ADM2_simplified.geojson
+License: CC BY 3.0 Unported, https://creativecommons.org/licenses/by/3.0/
+Adaptation: 228 features projected for display and quantized into integer rings.
+
+Province grouping: KOR ADM1 (2021), Natural Earth (public domain), distributed by geoBoundaries.
+Metadata: https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM1/
+Adaptation: assigned ADM2 features to ADM1 by maximum overlap, with corrections against 2020-era administrative names.
+Administrative reference: https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000055&nttId=77459

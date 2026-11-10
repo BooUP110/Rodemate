@@ -1,5 +1,7 @@
 plugins { alias(libs.plugins.android.application) }
 
+val naviProbe = providers.gradleProperty("roadmateNaviProbe").isPresent
+
 android {
     namespace = "io.booup.roadmate.uiprobe"
     compileSdk = 35
@@ -15,5 +17,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    if (naviProbe) {
+        sourceSets.named("main") {
+            java.srcDir("src/navi/java")
+            manifest.srcFile("src/navi/AndroidManifest.xml")
+        }
+    }
 }
-// Framework APIs only. No library, SDK, vehicle or application dependency.
+
+if (naviProbe) {
+    dependencies { implementation("ai.pleos.playground:NaviHelper:3.0.5") }
+}

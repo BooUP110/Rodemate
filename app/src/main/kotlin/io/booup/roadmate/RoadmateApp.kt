@@ -14,20 +14,33 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.booup.roadmate.model.*
 import io.booup.roadmate.presentation.DrivingPresentationPolicy
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 private enum class RoadmatePage(val label: String) {
-    HOME("동행"), MEMORY("드라이브 기억"), SEASON("시즌"), COLLECTION("컬렉션"), SETTINGS("설정"), DEMO("시연 선택")
+    HOME("동행"), MAP("탐험 지도"), COLLECTION("엽서 컬렉션"), SEASON("시즌 패스"),
+    MEMORY("드라이브 기억"), DEMO("시연 선택"), SETTINGS("설정")
 }
 
 /** Demo controls are supplied only by the variant composition root. */
 @Composable
-fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null, demoControls: (@Composable () -> Unit)? = null) {
+fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
+    demoControls: (@Composable () -> Unit)? = null, parkSimulation: (() -> Unit)? = null) {
     val context by viewModel.state.collectAsStateWithLifecycle()
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
     val post by viewModel.postDriveUiState.collectAsStateWithLifecycle()
     val care by viewModel.uiState.collectAsStateWithLifecycle()
+    val journey by viewModel.journey.collectAsStateWithLifecycle()
+    val progress by viewModel.progressUiState.collectAsStateWithLifecycle()
+    val game = viewModel.journeyGame
+    val gameState = game?.state?.collectAsStateWithLifecycle()?.value
+    val previews = viewModel.companionPreviews
+    val activePreview = previews.firstOrNull { it.profile.id == care.companion.id }
     var page by remember { mutableStateOf(RoadmatePage.HOME) }
+    var homeTrial by remember { mutableStateOf<CompanionPreview?>(null) }
+    var returnToMap by remember { mutableStateOf(false) }
+    var mapPlace by remember { mutableStateOf<JourneyPlace?>(null) }
+    var albumPlace by remember { mutableStateOf<JourneyPlace?>(null) }
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val clock = remember { AndroidContextClock() }
@@ -35,15 +48,39 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null, d
     val canBrowse = full && post.contentAllowed
     LaunchedEffect(canBrowse) {
         if (!canBrowse) { page = RoadmatePage.HOME; focus.clearFocus(force = true); keyboard?.hide() }
+        else viewModel.restoreJourneyCompanion()
+    }
+    LaunchedEffect(page, canBrowse) {
+        if (page != RoadmatePage.HOME || !canBrowse) homeTrial = null
+    }
+    LaunchedEffect(journey.running, canBrowse, returnToMap) {
+        if (returnToMap && !journey.running && canBrowse) {
+            mapPlace = journey.place
+            page = RoadmatePage.MAP
+            returnToMap = false
+        }
     }
     RoadmateTheme {
         Scaffold { insets ->
+            if (page == RoadmatePage.SEASON && canBrowse && game != null) {
+                JourneyPassContent(viewModel, game, "정차 · ${UiCopy.connection(context.connection.status)}",
+                    modifier = Modifier.fillMaxSize().padding(insets),
+                    openAlbum = { albumPlace = null; page = RoadmatePage.COLLECTION },
+                    openMemory = { page = RoadmatePage.MEMORY }, openHome = { page = RoadmatePage.HOME },
+                    tryOnHome = { homeTrial = it; page = RoadmatePage.HOME },
+                    priorityCare = {
+                        CareContent(care, { viewModel.respond(it) }, { id, revision -> viewModel.displayed(id, revision) },
+                            { viewModel.selectCompanion(it) }, showCompanionPicker = false)
+                    })
+                return@Scaffold
+            }
             Column(Modifier.fillMaxSize().padding(insets).imePadding().padding(horizontal = 28.dp, vertical = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     Text("AI Roadmate", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-                    RoadmateBadge(simulationLabel ?: "실제 차량 정보 · 읽기 전용", demo = simulationLabel != null)
+                    RoadmateBadge(if (previews.isNotEmpty()) "내부 콜라보 예시 · SIMULATED"
+                        else simulationLabel ?: "실제 차량 정보 · 읽기 전용", demo = simulationLabel != null)
                 }
                 if (simulationLabel != null) Text("시뮬레이션으로 서비스 흐름을 체험해요. 실제 차량은 변경하지 않아요.",
                     style = MaterialTheme.typography.bodyMedium)
@@ -51,7 +88,12 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null, d
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         RoadmatePage.entries.filter { it != RoadmatePage.DEMO || demoControls != null }.forEach { target ->
                             FilterChip(selected = page == target, enabled = canBrowse || target in setOf(RoadmatePage.HOME, RoadmatePage.DEMO),
-                                onClick = { focus.clearFocus(); keyboard?.hide(); page = target },
+                                onClick = {
+                                    focus.clearFocus(); keyboard?.hide()
+                                    if (target == RoadmatePage.MAP) mapPlace = null
+                                    if (target == RoadmatePage.COLLECTION) albumPlace = null
+                                    page = target
+                                },
                                 label = { Text(target.label) }, modifier = Modifier.heightIn(min = 56.dp))
                         }
                     }
@@ -59,25 +101,69 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null, d
                 CareContent(care, { viewModel.respond(it) }, { id, revision -> viewModel.displayed(id, revision) },
                     { viewModel.selectCompanion(it) }, showCompanionPicker = false)
                 key(page, canBrowse, full) {
-                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
+                    val scroll = rememberScrollState()
+                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        if (canBrowse && page in setOf(RoadmatePage.MAP, RoadmatePage.COLLECTION, RoadmatePage.SEASON)) {
+                            Text("정차 상태 · ${UiCopy.connection(context.connection.status)}", style = MaterialTheme.typography.labelMedium)
+                        }
                         when {
                             page == RoadmatePage.DEMO && full && demoControls != null -> demoControls()
-                            page == RoadmatePage.MEMORY && canBrowse -> PostDriveContent(viewModel)
-                            page == RoadmatePage.SEASON && canBrowse -> SeasonContent(viewModel)
-                            page == RoadmatePage.COLLECTION && canBrowse -> CollectionContent(viewModel)
+                            page == RoadmatePage.MEMORY && canBrowse -> PostDriveContent(viewModel,
+                                openAlbum = { albumPlace = it; page = RoadmatePage.COLLECTION },
+                                openMap = { mapPlace = it; page = RoadmatePage.MAP }, openSeason = { page = RoadmatePage.SEASON })
+                            page == RoadmatePage.MAP && canBrowse -> ExplorationContent(viewModel, context.mode,
+                                initialPlace = mapPlace,
+                                openCollection = { albumPlace = it; page = RoadmatePage.COLLECTION },
+                                openMemory = { page = RoadmatePage.MEMORY }, openSeason = { page = RoadmatePage.SEASON }, onSimulate = { place ->
+                                    viewModel.simulateVisit(place)
+                                    returnToMap = true
+                                })
+                            page == RoadmatePage.SEASON && canBrowse -> SeasonContent(viewModel, activePreview ?: previews.firstOrNull())
+                            page == RoadmatePage.COLLECTION && canBrowse -> CollectionContent(viewModel, activePreview, albumPlace) {
+                                mapPlace = it; page = RoadmatePage.MAP
+                            }
                             page == RoadmatePage.SETTINGS && canBrowse -> RecordSettingsContent(viewModel)
                             !full -> RoadmateCard {
                                 Text(UiCopy.connection(context.connection.status), style = MaterialTheme.typography.titleMedium)
                                 Text(UiCopy.trip(trip.runtime.state, trip.runtime.recoveryRequired), style = MaterialTheme.typography.headlineMedium)
                                 Text("기록과 설정은 정차 상태와 화면 허용을 확인한 뒤 열 수 있어요.",
                                     style = MaterialTheme.typography.bodyMedium)
+                                if (journey.running) {
+                                    Text("${journey.place?.name.orEmpty()} 방문 시연 중 · 정차 후 지도로 돌아가요.",
+                                        style = MaterialTheme.typography.bodyMedium)
+                                } else if (parkSimulation != null) {
+                                    OutlinedButton(onClick = parkSimulation, modifier = Modifier.heightIn(min = 56.dp)) {
+                                        Text("시뮬레이션 정차")
+                                    }
+                                }
                             }
-                            else -> HomeContent(context, trip, care, post, canBrowse, simulationLabel != null,
+                            else -> {
+                                if (canBrowse && gameState != null) RoadmateCard(tinted = true) {
+                                    val found = journey.place.takeIf { journey.saved }
+                                    val xp = progress.active?.progress?.totalXp ?: 0
+                                    Text("오늘의 발견", style = MaterialTheme.typography.titleMedium)
+                                    Text(found?.let { "${it.name} 방문 기록 · 시즌 $xp XP" } ?: "모은 엽서 ${post.collection.size}장 · 시즌 $xp XP")
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(onClick = { mapPlace = found; page = RoadmatePage.MAP }, modifier = Modifier.heightIn(min = 52.dp)) { Text("탐험 기록") }
+                                        OutlinedButton(onClick = { page = RoadmatePage.SEASON }, modifier = Modifier.heightIn(min = 52.dp)) { Text("시즌 보상") }
+                                    }
+                                }
+                                val trial = homeTrial.takeIf { canBrowse }
+                                HomeContent(context, trip, trial?.profile ?: care.companion, post, canBrowse, simulationLabel != null,
                                 openMemory = {
                                     trip.runtime.completed?.let { record -> viewModel.postDriveAction { it.open(record.tripId) } }
                                     page = RoadmatePage.MEMORY
-                                }, openSettings = { page = RoadmatePage.SETTINGS })
+                                }, openSettings = { page = RoadmatePage.SETTINGS }, readWarnings = viewModel::readParkedWarnings,
+                                previews = if (gameState == null) previews else previews.filter { it.profile.id in gameState.companions },
+                                activePreview = trial ?: activePreview,
+                                endTrial = if (trial == null) null else { { homeTrial = null } }, selectCompanion = { id ->
+                                    homeTrial = null
+                                    if (gameState == null) viewModel.selectCompanion(id)
+                                    else if (id in gameState.companions) viewModel.equipJourneyCompanion(id)
+                                    else viewModel.equipDefaultCompanion(id)
+                                })
+                            }
                         }
                     }
                 }
@@ -87,17 +173,38 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null, d
 }
 
 @Composable
-private fun HomeContent(context: VehicleContext, trip: TripUiState, care: CareUiState, post: PostDriveUiState,
-    canBrowse: Boolean, demo: Boolean, openMemory: () -> Unit, openSettings: () -> Unit) {
+private fun HomeContent(context: VehicleContext, trip: TripUiState, companionProfile: CompanionProfile, post: PostDriveUiState,
+    canBrowse: Boolean, demo: Boolean, openMemory: () -> Unit, openSettings: () -> Unit,
+    readWarnings: suspend () -> AdapterResult<List<String>>, previews: List<CompanionPreview>,
+    activePreview: CompanionPreview?, endTrial: (() -> Unit)?, selectCompanion: (CompanionId) -> Unit) {
     BoxWithConstraints {
         val wide = maxWidth >= 960.dp
         val companion: @Composable () -> Unit = {
             RoadmateCard(tinted = true) {
-                CompanionPortrait(care.companion.displayName, care.companion.tone == CompanionTone.WARM,
+                if (canBrowse && previews.isNotEmpty()) {
+                    Text("동반자 꾸미기", style = MaterialTheme.typography.titleMedium)
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (previews.map { it.profile } + CompanionProfiles.all).forEach { profile ->
+                            FilterChip(selected = companionProfile.id == profile.id,
+                                onClick = { selectCompanion(profile.id) }, label = { Text(profile.displayName) },
+                                modifier = Modifier.heightIn(min = 56.dp))
+                        }
+                    }
+                }
+                if (activePreview == null) CompanionPortrait(companionProfile.displayName, companionProfile.tone == CompanionTone.WARM,
                     Modifier.fillMaxWidth().heightIn(max = 260.dp))
-                Text(care.companion.displayName, style = MaterialTheme.typography.titleLarge)
+                else CompanionPreviewPortrait(activePreview, Modifier.fillMaxWidth().height(224.dp), roam = canBrowse)
+                Text(companionProfile.displayName, style = MaterialTheme.typography.titleLarge)
                 Text("함께 달리고, 잠시 쉬고,\n오늘의 드라이브를 기억해요.", style = MaterialTheme.typography.bodyLarge)
-                Text("오리지널 동반자 · 임시 디자인", style = MaterialTheme.typography.labelMedium)
+                Text(if (activePreview == null) "오리지널 동반자 · 임시 디자인" else "가상 콜라보 · 내부 시연",
+                    style = MaterialTheme.typography.labelMedium)
+                if (canBrowse && activePreview?.idleAtlas != null) {
+                    Text("캐릭터를 누르면 인사해요.", style = MaterialTheme.typography.labelMedium)
+                }
+                if (endTrial != null) OutlinedButton(onClick = endTrial, modifier = Modifier.heightIn(min = 56.dp)) {
+                    Text("체험 끝내기")
+                }
             }
         }
         val status: @Composable () -> Unit = {
@@ -130,7 +237,9 @@ private fun HomeContent(context: VehicleContext, trip: TripUiState, care: CareUi
         if (wide) Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
             Box(Modifier.weight(.36f)) { companion() }
             Box(Modifier.weight(.64f)) { status() }
-        } else Column(verticalArrangement = Arrangement.spacedBy(20.dp)) { status(); companion() }
+        } else Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (previews.isNotEmpty()) { companion(); status() } else { status(); companion() }
+        }
     }
     if (!canBrowse) RoadmateCard {
         Text("기억과 시즌은 정차 후에", style = MaterialTheme.typography.titleMedium)
@@ -149,8 +258,27 @@ private fun HomeContent(context: VehicleContext, trip: TripUiState, care: CareUi
             Text("앞좌석 왼쪽 공조 설정  " + (context.frontLeftTargetTemperatureCelsius.currentValue?.let(UiCopy::temperature)
                 ?: UiCopy.unavailable(context.frontLeftTargetTemperatureCelsius.availability)), style = MaterialTheme.typography.bodyMedium)
             Text("외기 온도 · 차량 센서  "+UiCopy.temperatureReading(context.outsideTemperatureCelsius),style=MaterialTheme.typography.bodyMedium)
-            Text("일부 케어 안내는 필요한 차량 정보가 확인되면 이용할 수 있어요. 현재는 자동 안내를 제공하지 않아요.",
+            Text("일부 케어 안내는 필요한 차량 정보가 확인되면 이용할 수 있어요.",
                 style = MaterialTheme.typography.bodyMedium)
+            val scope = rememberCoroutineScope()
+            var loading by remember { mutableStateOf(false) }
+            var result by remember { mutableStateOf<AdapterResult<List<String>>?>(null) }
+            OutlinedButton(enabled = !loading, modifier = Modifier.heightIn(min = 56.dp), onClick = {
+                loading = true
+                result = null
+                scope.launch {
+                    try { result = readWarnings() } finally { loading = false }
+                }
+            }) { Text(if (loading) "확인 중…" else "경고등 조회") }
+            when (val response = result) {
+                is AdapterResult.Available -> {
+                    if (response.value.isEmpty()) Text("이번 조회에서 켜지거나 점멸한 경고등을 받지 못했어요.")
+                    else response.value.forEach { Text(it) }
+                    Text("조회 시점의 차량 정보예요. 계기판의 안내를 확인하세요.", style = MaterialTheme.typography.bodyMedium)
+                }
+                is AdapterResult.Unavailable -> Text("경고등 정보를 확인할 수 없어요.")
+                null -> Unit
+            }
         }
     }
 }

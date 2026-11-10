@@ -1,11 +1,15 @@
 # 빌드 및 실행
 
+통합 변경과 검증 결과는 [Phase8.6 / wkdal 통합 검토](MERGE_PHASE86_WKDAL.md)를 따른다. `phase86IsolatedAcceptance`와 `roadmateInternalCollabs`는 동시에 지정할 수 없다. 검증 앱과 내부 콜라보 앱의 UID·저장·키 격리를 유지한다.
+
+콜라보 이미지/카탈로그는 Git 제외 자료이므로 다른 PC에서 자동으로 생기지 않는다. 아래 내부 빌드 안내의 `development/collab-preview/assets/companion-previews/` 자료가 있을 때 게임·전용 패스·캐릭터를 활성화한다. 자료가 없으면 기존 기본 Demo/Production 흐름을 유지한다.
+
 ## 환경
 
 | 항목 | 현재 프로젝트 값 |
 |---|---|
 | JDK | 실제 빌드 검증21.0.4, JVM target17 |
-| Gradle / AGP / Kotlin | Wrapper8.10.2 / 8.8.2 / 2.0.0 |
+| Gradle / AGP / Kotlin | Wrapper8.13 / 8.13.2 / 2.0.0 |
 | Android SDK | compile/target35, min28, build-tools35.0.1 |
 | Compose | BOM2024.04.01 |
 | Pleos 의존성 | Production 전용 Vehicle2.3.2, vehicle-data1.1.11 |
@@ -66,3 +70,37 @@ tools/ui-probe는 제품 APK와 독립된 testOnly UI 관측 도구다. 필요�
 Phase8.6의 삭제/회고 자동 검증에는 `-Pphase86IsolatedAcceptance :app:assembleProductionDebug :app:assembleProductionDebugAndroidTest`로 별도 검증 APK를 만들었다. 같은 Production 소스를 쓰되 앱 ID는 `io.booup.roadmate.acceptance`, 출력은 `app/build/phase86-acceptance/`이며 UID·데이터·Keystore를 원래 앱과 분리한다. 이 옵션에서는 release가 비활성이다. 일반 Production 산출물을 대체하지 않으며 사용자는 기본 Production 앱으로 검수한다. 별도 계측 APK의 `Phase86Instrumentation`은 보안 fixture/현재 파일의 count-only 확인/외기 연결 검증을 수행하고 제품 APK에는 포함되지 않는다. 과거 `ClosureInstrumentation`은 이번 실행에서 사용하지 않았다.
 
 Keystore 키가 없거나 암호문 인증에 실패하면 기존 파일을 자동 초기화하지 않는다. 재설치/데이터 지우기로 해결하려 하지 말고 [저장 보안](PHASE8_6_STORAGE_SECURITY.md)과 [migration](PHASE8_6_STORAGE_MIGRATION.md)을 먼저 확인한다. 단말의 전체 앱 데이터/키 삭제나 복구는 이번 자동 검증에 포함되지 않는다.
+### NaviHelper 위치 응답 확인
+
+Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형식을 확인한다. 결과에는 좌표의 범위 확인 여부만 남는다. 도착 시점과의 일치 여부 및 엽서 발급은 별도로 검증한다.
+
+~~~powershell
+.\gradlew.bat -Pphase8UiProbe -ProadmateNaviProbe :ui-probe:assembleDebug
+& $roadmateAdb -s emulator-5554 install -r -t tools/ui-probe/build/outputs/apk/debug/ui-probe-debug.apk
+& $roadmateAdb -s emulator-5554 shell am instrument -w io.booup.roadmate.uiprobe/.NaviLocationProbe
+~~~
+
+### 내부 콜라보 미리보기
+
+로컬 `development/collab-preview/assets/companion-previews/`에 `catalog.json`과 각 초상화를 둔다. 카탈로그는 `id`, `name`, `seasonTitle`과 선택 항목 `tone`(`WARM` 또는 `CALM`)을 담은 객체 배열이다. `<id>.png` 또는 `<id>-idle.png`를 사용한다. 동작 파일의 2×2 칸은 왼쪽 위부터 오른쪽 아래 순으로 재생한다. 내부 시연 앱 이름은 로컬 `development/collab-preview/res/values/strings.xml`의 `app_name`으로 지정할 수 있다.
+
+시즌 화면의 일러스트는 로컬 `development/collab-preview/assets/pass-worlds/`에 `travel.jpg`, `stars.jpg`, `coast.jpg`, `post.jpg`로 둔다. 해당 이미지가 없는 빌드는 테마별 그라데이션 배경을 사용한다.
+
+~~~powershell
+.\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:mergeDemoDebugAssets --rerun :app:packageInternalCollab
+~~~
+
+내부 APK는 `development/collab-preview/apk/roadmate-collab-debug.apk`에 복사되고 앱 ID는 `io.booup.roadmate.demo.collab`이다. 로컬 `development/`는 Git 제외 경로다. 내부 이미지가 담긴 APK는 가상 콜라보 시연용으로 관리한다.
+
+### 탐험 지도와 엽서 시연
+
+1. **탐험 지도 → 지역 선택 → 방문 시연**으로 합성 트립을 재생한다. 정차 후 발견 리포트, 해당 구역과 엽서가 열리고 첫 방문 XP가 세 테마 패스에 공유된다.
+2. **여행 엽서 펼치기 → 별 스탬프 붙이기**로 미션 보드 첫 줄을 완성한다. **시즌 패스 → 미션 보드**에서 미보유 패스권 한 종을 선택한다.
+3. **시즌 패스**에서 일러스트 포스터를 눌러 해당 패스에 들어간다. 화면 아래 여행 리본의 레벨 표식을 누르면 무료·프리미엄 보상이 열린다. **패스권 뽑기**에서 무료 시연권으로 미보유 패스를 뽑고 봉투를 연다. 강릉과 제주 엽서를 모으면 두 번째 시연권이 열린다.
+4. 네 시연 지역의 첫 방문을 기록하면 시연 설정 기준 최대 레벨에 도달한다. 보유한 프리미엄 패스에서 **Lv.5 표식 → 동반자 팩 열기 → 받기 → 로드메이트로 지정**을 누른다. 다시 방문 시연을 하면 **내 패스함**에 동반자의 첫 동행 엽서가 생긴다.
+
+내부 시연판에서는 **동반자 체험 → 캐릭터 선택 → 동행 홈에서 체험**으로 정차 중 홈에 캐릭터를 잠시 적용할 수 있다. 캐릭터는 동행 카드에서 좌우로 이동하고, 누르면 멈춰서 인사한다. **체험 끝내기**를 누르거나 홈을 벗어나면 기존 동반자로 돌아간다. [내부 검토용 모션 목업](internal-demo/companion-motion-mockup.gif)
+
+시연 경로는 합성 트립에 연결된다. Production의 위치 응답과 실제 경로 격자는 별도 검증 단계다.
+
+지도는 [geoBoundaries KOR ADM2, 2020](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM2/)의 [고정 버전 단순화 경계](https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/KOR/ADM2/geoBoundaries-KOR-ADM2_simplified.geojson)를 사용한다. 원저자는 geoBoundaries와 citypopulation.de이며 라이선스는 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)이다. 앱의 `journey/korea-districts.json`은 원본 파일의 228개 피처에서 식별자와 링 좌표를 추출해 화면용으로 투영하고 반올림한 파생 자료다. 엽서 배경은 생성한 여행 일러스트다.
