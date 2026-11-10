@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import io.booup.roadmate.model.*
 import io.booup.roadmate.presentation.CareInteractionRuntime
+import io.booup.roadmate.presentation.DrivingPresentationPolicy
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -16,6 +17,27 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     private val binding = factory(viewModelScope)
     val state = binding.repository.context
     val developerPanel = binding.developerPanel
+    val companionPreviews = binding.companionPreviews
+    val canSimulateVisit = binding.simulateVisit != null
+    private val mutableJourney = MutableStateFlow(JourneyVisitUi())
+    val journey = mutableJourney.asStateFlow()
+    fun simulateVisit(place: JourneyPlace) {
+        val simulate = binding.simulateVisit ?: return
+        if (mutableJourney.value.running) return
+        mutableJourney.value = JourneyVisitUi(place, running = true)
+        viewModelScope.launch {
+            var saved = false
+            try { saved = simulate(place) } finally { mutableJourney.value = JourneyVisitUi(place, saved = saved) }
+        }
+    }
+    val parkSimulation = binding.parkSimulation
+    suspend fun readParkedWarnings(): AdapterResult<List<String>> {
+        val clock = binding.clock ?: return AdapterResult.Unavailable(UnavailableReason.NOT_VERIFIED)
+        fun parked() = DrivingPresentationPolicy().mode(state.value, clock.now()) == DrivingPresentationMode.FULL_PARKED
+        if (!parked()) return AdapterResult.Unavailable(UnavailableReason.NOT_VERIFIED)
+        val result = binding.readParkedWarnings?.invoke() ?: return AdapterResult.Unavailable(UnavailableReason.UNSUPPORTED)
+        return if (parked()) result else AdapterResult.Unavailable(UnavailableReason.NOT_VERIFIED)
+    }
     val onLaunch = binding.onLaunch
     val trips = binding.trips
     val tripUiState = trips?.uiState ?: MutableStateFlow(TripUiState()).asStateFlow()
@@ -23,7 +45,10 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     val postDriveUiState = postDrive?.uiState ?: MutableStateFlow(PostDriveUiState()).asStateFlow()
     val progress=binding.progress
     val progressUiState=progress?.uiState ?: MutableStateFlow(ProgressUiState()).asStateFlow()
-    private val interaction = binding.clock?.let { CareInteractionRuntime(it, simulationFeedback = binding.simulationFeedback) }
+    private val interaction = binding.clock?.let {
+        CareInteractionRuntime(it, simulationFeedback = binding.simulationFeedback,
+            previewProfiles = companionPreviews.map { preview -> preview.profile })
+    }
     val uiState = interaction?.uiState ?: MutableStateFlow(CareUiState()).asStateFlow()
     val interactionRecords = interaction?.records ?: MutableStateFlow<Map<String, InteractionRecord>>(emptyMap()).asStateFlow()
     private var presentationTicker: Job? = null

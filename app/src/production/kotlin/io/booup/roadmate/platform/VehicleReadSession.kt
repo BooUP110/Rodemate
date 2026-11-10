@@ -1,12 +1,14 @@
 package io.booup.roadmate.platform
 
 import io.booup.roadmate.model.LowBeamState
+import io.booup.roadmate.model.AdapterResult
 import io.booup.roadmate.model.UnavailableReason
 
 /** Product-owned port. SDK DTOs and Android services do not cross this boundary. */
 interface VehicleReadSession {
     fun start(observer: VehicleReadObserver)
     fun refresh()
+    suspend fun readTelltales(): AdapterResult<List<String>> = AdapterResult.Unavailable(UnavailableReason.UNSUPPORTED)
     fun close()
 }
 

@@ -187,6 +187,21 @@ class CareInteractionTest {
         assertTrue(f.runtime.selectCompanion(CompanionProfiles.somsom.id))
         assertEquals(p1, f.runtime.uiState.value.presentation)
     }
+    @Test fun previewProfileChangesOnlyAppearanceInParkedDemo() {
+        val clock = TestCareClock()
+        val preview = CompanionProfile(CompanionId("preview:test"), "시연", "시", CompanionTone.WARM)
+        val runtime = CareInteractionRuntime(clock, previewProfiles = listOf(preview))
+        val decision = CareDecision(careEvent("care.safety.low_beam_off"))
+        val parked = parkedContext()
+        runtime.update(decision, parked)
+        val originalWarning = requireNotNull(runtime.uiState.value.presentation)
+        assertTrue(runtime.selectCompanion(preview.id))
+        assertEquals(preview, runtime.uiState.value.companion)
+        assertEquals(originalWarning, runtime.uiState.value.presentation)
+        runtime.update(decision, parked.copy(mode = RuntimeMode.PRODUCTION))
+        assertFalse(runtime.selectCompanion(preview.id))
+        assertEquals(CompanionProfiles.dodam, runtime.uiState.value.companion)
+    }
     @Test fun simulationIsExplicitAndNeverASuccessResult() {
         val f = Fixture(SimulationFeedback { ExecutionStatus.SIMULATED }); f.update()
         assertTrue(f.runtime.respond(f.response()))

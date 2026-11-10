@@ -9,12 +9,17 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.booup.roadmate.model.*
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneOffset
 
 /** UI owns navigation/drafts/dialogs only. Coordinators revalidate every action. */
 @Composable
 fun PostDriveContent(viewModel: RoadmateViewModel) {
     val state by viewModel.postDriveUiState.collectAsStateWithLifecycle()
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
+    val care by viewModel.uiState.collectAsStateWithLifecycle()
+    val preview = viewModel.companionPreviews.firstOrNull { it.profile.id == care.companion.id }
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     DisposableEffect(Unit) { onDispose { focus.clearFocus(force = true); keyboard?.hide() } }
@@ -57,6 +62,13 @@ fun PostDriveContent(viewModel: RoadmateViewModel) {
             state.session.postcard?.let { postcard ->
                 RoadmateCard {
                     RoadmateBadge(if (postcard.source == RegionEvidenceSource.DEMO) "SIMULATED · 지역 엽서" else "지역 엽서")
+                    val destination = journeyPlaces.firstOrNull { it.id == postcard.key.regionId }
+                    if (destination != null) {
+                        PostcardArtwork(destination, artwork("journey/postcards.png"), preview, Modifier.fillMaxWidth().height(210.dp),
+                            animate = state.session.reveal, companion = care.companion)
+                    } else if (postcard.source == RegionEvidenceSource.DEMO && preview != null) {
+                        CompanionPreviewPortrait(preview, Modifier.size(128.dp))
+                    }
                     Text(if (state.session.reveal) "새로운 기억을 발견했어요" else "함께 모은 엽서", style = MaterialTheme.typography.titleLarge)
                     Text(postcard.regionLabel, style = MaterialTheme.typography.headlineMedium)
                     Text(UiCopy.season(postcard.calendar.season) + "의 드라이브 · 컬렉션에 저장됨")
@@ -85,6 +97,29 @@ fun PostDriveContent(viewModel: RoadmateViewModel) {
                     modifier = Modifier.heightIn(min = 56.dp)) { Text("이 이야기를 별도 기억으로 저장") }
                 Text(if (state.memoryEnabled) "회고 저장과 별개예요. 한 번 더 확인한 이야기만 기억해요."
                     else "별도 기억을 원하면 설정에서 먼저 허용해 주세요.", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        if (state.historyEnabled) {
+            val month = YearMonth.now(ZoneOffset.UTC)
+            val monthTrips = state.trips.filter { record ->
+                record.endedAtEpochMillis?.let { YearMonth.from(Instant.ofEpochMilli(it).atOffset(ZoneOffset.UTC)) } == month
+            }
+            val favorites = monthTrips.asReversed().filter { record ->
+                trip.storage.postDrive[record.tripId]?.reflection?.mood == ReflectionMood.GOOD
+            }.take(3)
+            RoadmateCard {
+                Text("우리의 이번 달", style = MaterialTheme.typography.titleLarge)
+                Text("${month.year}년 ${month.monthValue}월 · UTC", style = MaterialTheme.typography.labelMedium)
+                if (monthTrips.isEmpty()) {
+                    Text("이번 달에 저장된 드라이브가 아직 없어요.")
+                } else {
+                    if (favorites.isNotEmpty()) Text("좋았다고 남긴 드라이브")
+                    favorites.forEach { record ->
+                        OutlinedButton(onClick = { viewModel.postDriveAction { it.open(record.tripId) } },
+                            modifier = Modifier.heightIn(min = 56.dp)) { Text(UiCopy.date(record.startedAtEpochMillis)) }
+                    }
+                    Text("저장한 드라이브 ${monthTrips.size}회 · 기록 시간 " + UiCopy.duration(monthTrips.sumOf { it.durationMillis }))
+                }
             }
         }
         Text("저장된 드라이브", style = MaterialTheme.typography.titleLarge)
@@ -210,29 +245,6 @@ fun RecordSettingsContent(viewModel: RoadmateViewModel) {
                 }
             } }) { Text("확인") } },
             dismissButton = { TextButton(onClick = { confirmation = null }) { Text("취소") } })
-    }
-}
-
-@Composable
-fun CollectionContent(viewModel: RoadmateViewModel) {
-    val state by viewModel.postDriveUiState.collectAsStateWithLifecycle()
-    if (!state.contentAllowed) return
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("드라이브 컬렉션", style = MaterialTheme.typography.headlineMedium)
-        Text("함께 발견한 지역의 기억을 모아요.", style = MaterialTheme.typography.bodyMedium)
-        if (state.collection.isEmpty()) RoadmateCard(tinted = true) {
-            Text("아직 모인 엽서가 없어요", style = MaterialTheme.typography.titleLarge)
-            Text("지원되는 지역 기록이 생기면 여기에 모여요. 확인되지 않은 장소의 엽서는 만들지 않아요.",
-                style = MaterialTheme.typography.bodyMedium)
-        }
-        state.collection.forEach { postcard ->
-            RoadmateCard(tinted = true) {
-                RoadmateBadge(if (postcard.source == RegionEvidenceSource.DEMO) "SIMULATED · 지역 엽서" else "지역 엽서")
-                Text(postcard.regionLabel, style = MaterialTheme.typography.headlineMedium)
-                Text(UiCopy.season(postcard.calendar.season) + "의 기억 · " + UiCopy.date(postcard.acquiredAtEpochMillis) + " UTC")
-            }
-        }
-        Text("드라이브 기록을 지워도 모은 엽서는 원본 기록 연결 없이 유지해요.", style = MaterialTheme.typography.bodyMedium)
     }
 }
 

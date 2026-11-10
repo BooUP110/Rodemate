@@ -78,9 +78,15 @@ class DemoScenarioTest(private val id: DemoScenarioId) {
 @OptIn(ExperimentalCoroutinesApi::class)
 class DemoRuntimeTest {
     @Test fun demoCompositionRootExposesDeveloperPanelAndOnlySimulatedRuntime() = runTest {
-        val binding = RuntimeBindings.create(backgroundScope, ContextClock { ObservationTime(1_000, 1_000) })
+        val clock = ContextClock { ObservationTime(1_000 + testScheduler.currentTime, 1_000 + testScheduler.currentTime) }
+        val binding = RuntimeBindings.create(backgroundScope, clock)
         assertEquals(RuntimeMode.DEMO, binding.repository.context.value.mode)
         assertNotNull(binding.developerPanel)
+        binding.repository.foreground(); runCurrent()
+        advanceTimeBy(20_001); runCurrent()
+        val state = binding.repository.context.value
+        assertTrue(ContentGate().access(ContentArea.COLLECTION, state).allowed)
+        assertEquals(DataSource.SIMULATED, state.motion.source)
         binding.repository.close()
     }
     @Test fun selectingDisconnectedThenNormalRestoresOnlyNewSimulatedValues() = runTest {

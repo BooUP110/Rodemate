@@ -13,7 +13,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.booup.roadmate.context.VehicleContextStore
 import io.booup.roadmate.demo.DemoScenarios
+import io.booup.roadmate.demo.DemoScenarioId
 import io.booup.roadmate.demo.DemoVehicleAdapter
+import io.booup.roadmate.demo.DemoJourney
+import io.booup.roadmate.demo.journeySeason
 import io.booup.roadmate.demo.CareDemoScenarioId
 import io.booup.roadmate.demo.InteractionDemoScenarioId
 import io.booup.roadmate.demo.DemoLaunchInput
@@ -44,19 +47,23 @@ import io.booup.roadmate.postdrive.RegionEvidenceProvider
 object RuntimeBindings {
     val runtimePermissions: List<String> = emptyList()
     fun create(context: android.content.Context, scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null): RuntimeBinding =
-        create(scope, clock, storageRoot)
-    fun create(scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null): RuntimeBinding {
-        val adapter = DemoVehicleAdapter(clock)
+        create(scope, clock, storageRoot, localCompanionPreviews(context.assets))
+    fun create(scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null,
+        previews: List<CompanionPreview> = emptyList()): RuntimeBinding {
+        val adapter = DemoVehicleAdapter(clock).apply { select(DemoScenarioId.A_NORMAL) }
         val repository = VehicleContextStore(adapter, RuntimeMode.DEMO, clock, scope)
         val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-demo"), RuntimeMode.DEMO) }
         val trips = storage?.let { TripCoordinator(it,
             RuntimeMode.DEMO, clock, TripIdSource { UUID.randomUUID().toString() }, TripConfig(TripDemoScenarios.START_MILLIS, TripDemoScenarios.STOP_MILLIS)) }
         val controller = trips?.let { DemoTripController(adapter, it, clock, scope) }
+        val journey = trips?.takeIf { previews.isNotEmpty() }?.let { DemoJourney(adapter, it) }
         val post = trips?.let { PostDriveCoordinator(it, requireNotNull(storage), RuntimeMode.DEMO, clock,
-            { repository.context.value }, RegionEvidenceProvider { trip -> ProgressDemoScenarios.region(adapter.progressSelection.value,trip)
+            { repository.context.value }, RegionEvidenceProvider { trip -> journey?.evidence(trip) ?: ProgressDemoScenarios.region(adapter.progressSelection.value,trip)
                 ?: PostDriveDemoScenarios.region(adapter.postDriveSelection.value,trip) }) }
         val postController = post?.let { PostDriveDemoController(adapter, requireNotNull(trips), it, requireNotNull(storage), scope) }
-        val progress=post?.let { ProgressCoordinator(requireNotNull(storage),RuntimeMode.DEMO,clock,{it.controlsAllowed()},catalog=ProgressDemoScenarios.catalog) }
+        val progress=post?.let { ProgressCoordinator(requireNotNull(storage),RuntimeMode.DEMO,clock,{it.controlsAllowed()},
+            initialSeasons = previews.firstOrNull()?.let { preview -> listOf(journeySeason(preview)) }.orEmpty(),
+            catalog = if (journey == null) ProgressDemoScenarios.catalog else null, seedOnlyWhenEmpty = journey != null) }
         val progressController=progress?.let { ProgressDemoController(adapter,requireNotNull(trips),requireNotNull(storage),storage,requireNotNull(post),it,clock,scope) }
         val input = DemoLaunchInput(adapter, repository, clock, scope, controller, postController,progressController)
         return RuntimeBinding(
@@ -69,6 +76,9 @@ object RuntimeBindings {
             progress=progress,
             simulationFeedback = DemoSimulationFeedback(adapter),
             onLaunch = { intent -> input.fromHost(intent.getStringExtra("roadmate.demo.scenario")) },
+            parkSimulation = { adapter.select(DemoScenarioId.A_NORMAL) },
+            companionPreviews = previews,
+            simulateVisit = if (journey != null && post != null) { place -> journey.visit(place, post) } else null,
         )
     }
 }
@@ -97,7 +107,7 @@ private fun DemoScenarioSelector(adapter: DemoVehicleAdapter, input: DemoLaunchI
                 "기억" -> "오늘의 드라이브를 한 장에"
                 else -> "안전한 습관을 꾸미는 시즌"
             }, style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
-            Text(if (group == "케어") "안내가 시작되면 시연용 주행 제한도 적용돼요. 다음 시연은 안내서의 전환 명령으로 열 수 있어요."
+            Text(if (group == "케어") "주행 시연으로 메뉴가 잠기면 ‘시뮬레이션 정차’를 눌러 다음 시연을 선택하세요."
                 else "선택하면 Demo 기록·컬렉션·시즌이 초기화되고 시연용 저장 동의를 사용해요. 실제 사용자 동의가 아니에요.")
             val choices = when (group) {
                 "케어" -> listOf("하향등 P1 안내" to "I1_P1_LIGHT", "공조 제안과 수락" to "I2_HVAC_ACCEPT",

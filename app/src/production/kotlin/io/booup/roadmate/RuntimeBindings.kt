@@ -44,10 +44,11 @@ object RuntimeBindings {
     fun create(context: android.content.Context, scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null): RuntimeBinding {
         val logging = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
         val logger: (String) -> Unit = { if (logging) android.util.Log.i("RoadmatePleos", it) }
-        val binding = bind(scope, clock, storageRoot, io.booup.roadmate.platform.PleosVehicleAdapter(clock, scope,
+        val adapter = io.booup.roadmate.platform.PleosVehicleAdapter(clock, scope,
             { io.booup.roadmate.platform.SdkVehicleReadSession(context) }, log = logger,
             restrictionAdapter = io.booup.roadmate.platform.AaosDrivingRestrictionAdapter(context, clock, scope, log = logger),
-            motionAdapter = io.booup.roadmate.platform.AaosMotionAdapter(context, clock, scope, log = logger)))
+            motionAdapter = io.booup.roadmate.platform.AaosMotionAdapter(context, clock, scope, log = logger))
+        val binding = bind(scope, clock, storageRoot, adapter).copy(readParkedWarnings = adapter::readParkedWarnings)
         if (logging) scope.launch {
             binding.repository.context.map { state ->
                 "context connection=${state.connection.status} lowBeam=${state.lowBeam.currentValue} availability=${state.lowBeam.availability} source=${state.lowBeam.source} totalKm=${state.totalOdometerKilometers.currentValue} frontLeftTargetC=${state.frontLeftTargetTemperatureCelsius.currentValue} motion=${state.motion.currentValue} motionSource=${state.motion.source} seat=${state.frontLeftSeatOccupied.currentValue} driver=${state.driverPresent.currentValue} restriction=${state.restrictions.currentValue?.mode} seasonGate=${ContentGate().access(ContentArea.SEASON_PASS,state).allowed}"

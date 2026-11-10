@@ -6,6 +6,7 @@ import io.booup.roadmate.contracts.VehicleContextRepository
 import io.booup.roadmate.contracts.CareRuleEngine
 import io.booup.roadmate.model.ContextClock
 import io.booup.roadmate.model.ObservationTime
+import io.booup.roadmate.model.AdapterResult
 import io.booup.roadmate.presentation.SimulationFeedback
 import android.content.Intent
 import io.booup.roadmate.trip.TripCoordinator
@@ -28,6 +29,10 @@ data class RuntimeBinding(
     val postDrive: PostDriveCoordinator? = null,
     val progress: io.booup.roadmate.progress.ProgressCoordinator? = null,
     val onCareDecision: ((io.booup.roadmate.model.CareDecision) -> Unit)? = null,
+    val parkSimulation: (() -> Unit)? = null,
+    val readParkedWarnings: (suspend () -> AdapterResult<List<String>>)? = null,
+    val companionPreviews: List<CompanionPreview> = emptyList(),
+    val simulateVisit: (suspend (JourneyPlace) -> Boolean)? = null,
 ) {
     init { require(presentationTickMillis > 0) }
 }

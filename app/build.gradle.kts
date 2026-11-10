@@ -4,6 +4,18 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val internalCollabs = providers.gradleProperty("roadmateInternalCollabs").isPresent
+if (internalCollabs) {
+    val preview = rootProject.layout.projectDirectory.dir("development/collab-preview")
+    layout.buildDirectory.set(preview.dir("build"))
+    tasks.register<Copy>("packageInternalCollab") {
+        dependsOn("assembleDemoDebug")
+        from(layout.buildDirectory.file("outputs/apk/demo/debug/app-demo-debug.apk"))
+        into(preview.dir("apk"))
+        rename { "roadmate-collab-debug.apk" }
+    }
+}
+
 android {
     namespace = "io.booup.roadmate"
     compileSdk = 35
@@ -21,7 +33,7 @@ android {
     productFlavors {
         create("demo") {
             dimension = "environment"
-            applicationIdSuffix = ".demo"
+            applicationIdSuffix = if (internalCollabs) ".demo.collab" else ".demo"
             versionNameSuffix = "-demo"
         }
         // 'production' is a flavor; 'release' remains the standard Android build type.
@@ -42,6 +54,13 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    if (internalCollabs) {
+        val preview = rootProject.file("development/collab-preview")
+        sourceSets.maybeCreate("demoDebug").apply {
+            assets.srcDir(preview.resolve("assets"))
+            res.srcDir(preview.resolve("res"))
+        }
+    }
     // Platform-provided AAOS API, not packaged SDK classes or an invented Maven artifact.
     useLibrary("android.car")
 }

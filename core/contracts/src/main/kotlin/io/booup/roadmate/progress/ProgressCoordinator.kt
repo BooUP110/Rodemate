@@ -9,10 +9,15 @@ import kotlinx.coroutines.sync.withLock
 
 class ProgressCoordinator(val repository:SeasonRepository,private val mode:RuntimeMode,private val clock:ContextClock,
     private val controlsAllowed:()->Boolean,private val initialSeasons:List<Season> = emptyList(),
-    private val catalog:RegionCatalog?=null) {
+    private val catalog:RegionCatalog?=null, private val seedOnlyWhenEmpty: Boolean = false) {
     private val mutex=Mutex(); private var error:StorageError?=null
     private val mutableUi=MutableStateFlow(ProgressUiState()); val uiState=mutableUi.asStateFlow()
-    suspend fun initialize()=mutex.withLock { capture(repository.installSeasons(initialSeasons)); publish() }
+    suspend fun initialize()=mutex.withLock {
+        if (!seedOnlyWhenEmpty || repository.state.value.progression.seasons.isEmpty()) {
+            capture(repository.installSeasons(initialSeasons))
+        }
+        publish()
+    }
     suspend fun refresh()=mutex.withLock {
         val s=repository.state.value
         if(s.loaded && s.error==null && s.progression.seasons.isNotEmpty()) {
@@ -25,6 +30,10 @@ class ProgressCoordinator(val repository:SeasonRepository,private val mode:Runti
         if(!controlsAllowed()) { publish(); return@withLock false }
         val ok=capture(repository.claimReward(seasonId,rewardId,clock.now(),repository.state.value.progression.generation))
         publish(); ok
+    }
+    suspend fun previewPremium(seasonId: String, enabled: Boolean) = mutex.withLock {
+        if (mode == RuntimeMode.DEMO && controlsAllowed()) capture(repository.setSimulatedPremium(seasonId, enabled))
+        publish()
     }
     private fun capture(result:StorageResult<Unit>):Boolean { error=(result as? StorageResult.Failure)?.error; return error==null }
     private fun publish(awarded:Long=0) {

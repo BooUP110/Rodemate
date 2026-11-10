@@ -15,6 +15,7 @@ class CareInteractionRuntime(
     private val resolver: CarePresentationResolver = CarePresentationResolver(),
     private val policy: DrivingPresentationPolicy = DrivingPresentationPolicy(),
     private val simulationFeedback: SimulationFeedback? = null,
+    private val previewProfiles: List<CompanionProfile> = emptyList(),
 ) {
     private var context: VehicleContext? = null
     private var decision = CareDecision()
@@ -34,6 +35,9 @@ class CareInteractionRuntime(
         val reset = context?.let { it.sessionId != vehicleContext.sessionId || it.mode != vehicleContext.mode } == true ||
             previousTime?.let { now.monotonicMillis < it } == true
         if (reset) entries.clear()
+        if (reset && vehicleContext.mode == RuntimeMode.PRODUCTION && previewProfiles.any { it.id == profile.id }) {
+            profile = CompanionProfiles.dodam
+        }
         previousTime = now.monotonicMillis
         context = vehicleContext
         decision = if (vehicleContext.foreground) next else CareDecision()
@@ -119,8 +123,10 @@ class CareInteractionRuntime(
     fun selectCompanion(id: CompanionId): Boolean {
         val currentContext = context ?: return false
         if (policy.mode(currentContext, clock.now()) != DrivingPresentationMode.FULL_PARKED) return false
-        if (CompanionProfiles.all.none { it.id == id }) return false
-        profile = CompanionProfiles.find(id)
+        val selected = CompanionProfiles.all.firstOrNull { it.id == id }
+            ?: previewProfiles.firstOrNull { currentContext.mode == RuntimeMode.DEMO && it.id == id }
+            ?: return false
+        profile = selected
         publish(clock.now())
         return true
     }

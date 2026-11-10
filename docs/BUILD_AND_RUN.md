@@ -61,3 +61,29 @@ Production과 Demo는 앱 서랍에서도 구분해 실행할 수 있다. instal
 http://127.0.0.1:8088/ 을 브라우저로 열고 활성 상태로 유지한다. Console은 AVD 시험 입력 도구이며 앱의 차량 제어 기능이 아니다. 상세 절차는 [시연 동선](SUBMISSION_DEMO_FLOW.md)을 따른다.
 
 tools/ui-probe는 제품 APK와 독립된 testOnly UI 관측 도구다. 필요한 경우 위 Gradle 공통 옵션에 -Pphase8UiProbe :ui-probe:assembleDebug를 추가해 빌드한다. 일반 빌드와 사용자 직접 검수에는 필요하지 않으며 제품에 의존성으로 포함되지 않는다. 원시 자동 수집 기록은 저장소에서 배포하지 않는다.
+
+### NaviHelper 위치 응답 확인
+
+Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형식을 확인한다. 결과에는 좌표의 범위 확인 여부만 남는다. 도착 시점과의 일치 여부 및 엽서 발급은 별도로 검증한다.
+
+~~~powershell
+.\gradlew.bat -Pphase8UiProbe -ProadmateNaviProbe :ui-probe:assembleDebug
+& $roadmateAdb -s emulator-5554 install -r -t tools/ui-probe/build/outputs/apk/debug/ui-probe-debug.apk
+& $roadmateAdb -s emulator-5554 shell am instrument -w io.booup.roadmate.uiprobe/.NaviLocationProbe
+~~~
+
+### 내부 콜라보 미리보기
+
+로컬 `development/collab-preview/assets/companion-previews/`에 `catalog.json`과 각 초상화를 둔다. 카탈로그는 `id`, `name`, `seasonTitle`과 선택 항목 `tone`(`WARM` 또는 `CALM`)을 담은 객체 배열이다. 초상화 파일명은 `<id>.png`로 맞춘다. `<id>-idle.png`가 있으면 동일한 크기의 2×2 칸을 왼쪽 위부터 오른쪽 아래 순으로 재생한다. 내부 시연 앱 이름은 로컬 `development/collab-preview/res/values/strings.xml`의 `app_name`으로 지정할 수 있다.
+
+~~~powershell
+.\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:packageInternalCollab
+~~~
+
+내부 APK는 `development/collab-preview/apk/roadmate-collab-debug.apk`에 복사되고 앱 ID는 `io.booup.roadmate.demo.collab`이다. 로컬 `development/`는 Git 제외 경로다. 내부 이미지가 담긴 APK는 가상 콜라보 시연용으로 관리한다.
+
+### 탐험 지도와 엽서 시연
+
+정차 홈에서 동반자를 선택한다. **탐험 지도 → 지역 선택 → 방문 시연**으로 약 10초 분량의 합성 트립을 재생한다. 정차 후 해당 구역과 엽서가 열리고, 완료된 트립과 발급된 엽서가 시즌 원장에 반영된다. **엽서 컬렉션**에서 엽서를 펼치고 **시즌 패스**에서 보상을 받는다. 프리미엄 체험은 내부 시연에서만 켤 수 있다. 지도는 시·군·구 방문 기록으로 안개를 걷고, 위치가 확인되지 않은 구역은 가려 둔다. Production의 위치 응답 검증과 경로 격자 수집은 별도 단계다.
+
+지도는 [geoBoundaries KOR ADM2, 2020](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM2/)의 [고정 버전 단순화 경계](https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/KOR/ADM2/geoBoundaries-KOR-ADM2_simplified.geojson)를 사용한다. 원저자는 geoBoundaries와 citypopulation.de이며 라이선스는 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)이다. 앱의 `journey/korea-districts.json`은 원본 파일의 228개 피처에서 식별자와 링 좌표를 추출해 화면용으로 투영하고 반올림한 파생 자료다. 엽서 배경은 생성한 여행 일러스트다.

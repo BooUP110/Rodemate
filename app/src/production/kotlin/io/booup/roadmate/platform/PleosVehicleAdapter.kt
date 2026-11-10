@@ -2,6 +2,7 @@ package io.booup.roadmate.platform
 
 import io.booup.roadmate.contracts.VehicleAdapter
 import io.booup.roadmate.contracts.DrivingRestrictionAdapter
+import io.booup.roadmate.context.ContinuousDrivingTracker
 import io.booup.roadmate.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -127,8 +128,11 @@ class PleosVehicleAdapter(
             }
             motionAdapter?.let { sourceAdapter ->
                 motionJob = scope.launch {
+                    val driving = ContinuousDrivingTracker()
                     sourceAdapter.observations.collect { observation -> receive(token) {
-                        publish(mutableFrames.value.copy(motion = observation.motion))
+                        val frame = mutableFrames.value
+                        publish(frame.copy(motion = observation.motion,
+                            care = frame.care.copy(continuousDriving = driving.observe(observation.motion))))
                     } }
                 }
                 sourceAdapter.connect()
@@ -143,6 +147,14 @@ class PleosVehicleAdapter(
             log("initialization failed type=${e.javaClass.name} message=${e.message}")
             try { session?.close() } finally { session = null }
             AdapterResult.Unavailable(UnavailableReason.SDK_ERROR)
+        }
+    }
+
+    suspend fun readParkedWarnings(): AdapterResult<List<String>> {
+        val (reader, token) = synchronized(lock) { session to generation }
+        val result = reader?.readTelltales() ?: return AdapterResult.Unavailable(UnavailableReason.NOT_CONNECTED)
+        return synchronized(lock) {
+            if (token == generation && !transportFailed) result else AdapterResult.Unavailable(UnavailableReason.DISCONNECTED)
         }
     }
 
