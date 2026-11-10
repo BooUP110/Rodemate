@@ -15,7 +15,8 @@ import java.time.ZoneOffset
 
 /** UI owns navigation/drafts/dialogs only. Coordinators revalidate every action. */
 @Composable
-fun PostDriveContent(viewModel: RoadmateViewModel) {
+fun PostDriveContent(viewModel: RoadmateViewModel, openAlbum: ((JourneyPlace?) -> Unit)? = null,
+    openMap: ((JourneyPlace?) -> Unit)? = null, openSeason: (() -> Unit)? = null) {
     val state by viewModel.postDriveUiState.collectAsStateWithLifecycle()
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
     val care by viewModel.uiState.collectAsStateWithLifecycle()
@@ -31,6 +32,8 @@ fun PostDriveContent(viewModel: RoadmateViewModel) {
         Text("함께 달린 순간을, 확인된 기록과 직접 남긴 이야기로 간직해요.", style = MaterialTheme.typography.bodyMedium)
         StorageNotice(state.error)
         state.session.card?.let { card ->
+            val entry = trip.storage.postcards.firstOrNull { it.sourceTripId == card.tripId }
+            val place = journeyPlaces.firstOrNull { it.id == entry?.key?.regionId }
             RoadmateCard(tinted = true) {
                 RoadmateBadge(if (card.source == DataSource.SIMULATED) "SIMULATED · 기억 카드" else "기억 카드")
                 Text(UiCopy.date(card.startedAtEpochMillis), style = MaterialTheme.typography.titleLarge)
@@ -40,6 +43,13 @@ fun PostDriveContent(viewModel: RoadmateViewModel) {
                 card.startLabel?.let { Text("출발  " + if (card.source == DataSource.SIMULATED) "시연 출발지" else it) }
                 card.endLabel?.let { Text("도착  " + if (card.source == DataSource.SIMULATED) "시연 도착지" else it) }
                 Text("달력 기준 " + UiCopy.season(card.calendar.season) + " · " + card.calendar.zoneId, style = MaterialTheme.typography.bodyMedium)
+                if (viewModel.journeyGame != null) {
+                    val xp = trip.storage.progression.ledger.filter { it.sourceTripId == card.tripId && it.seasonId == JOURNEY_SEASON_ID }
+                        .sumOf { it.awardedXp }
+                    Text("여행 시즌 +$xp XP" + (place?.let { " · ${it.name} 첫 방문" } ?: ""))
+                    if (place != null && openMap != null) TextButton(onClick = { openMap(place) }) { Text("탐험 지도에서 보기") }
+                    if (openSeason != null) TextButton(onClick = openSeason) { Text("시즌 보상 보기") }
+                }
                 if (card.careSummary.isNotEmpty()) {
                     Text("이번 드라이브의 안내", style = MaterialTheme.typography.titleMedium)
                     card.careSummary.forEach { summary ->
@@ -72,6 +82,7 @@ fun PostDriveContent(viewModel: RoadmateViewModel) {
                     Text(if (state.session.reveal) "새로운 기억을 발견했어요" else "함께 모은 엽서", style = MaterialTheme.typography.titleLarge)
                     Text(postcard.regionLabel, style = MaterialTheme.typography.headlineMedium)
                     Text(UiCopy.season(postcard.calendar.season) + "의 드라이브 · 컬렉션에 저장됨")
+                    if (openAlbum != null) TextButton(onClick = { openAlbum(destination) }) { Text("엽서 도감에서 열기") }
                 }
             }
             if (state.session.stage != PostDriveStage.COMPLETED) {

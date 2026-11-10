@@ -12,4 +12,5 @@ internal val journeyPlaces = listOf(
     JourneyPlace(RegionId("91817680B29624883381183"), "제주시", "제주의 노란 봄", "유채꽃과 섬 풍경을 담은 엽서", 3, 126.52, 33.49),
 )
 
-data class JourneyVisitUi(val place: JourneyPlace? = null, val running: Boolean = false, val saved: Boolean = false)
+data class JourneyVisitUi(val place: JourneyPlace? = null, val running: Boolean = false, val saved: Boolean = false,
+    val tripId: String? = null)

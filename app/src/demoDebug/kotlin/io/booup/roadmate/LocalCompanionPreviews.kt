@@ -25,11 +25,12 @@ internal fun localCompanionPreviews(assets: AssetManager): List<CompanionPreview
         val entry = entries.optJSONObject(index) ?: return@mapNotNull null
         val id = entry.optString("id")
         val name = entry.optString("name").trim()
-        val portrait = "$id.png"
+        val motion = "$id-idle.png".takeIf { it in files }
+        val portrait = "$id.png".takeIf { it in files } ?: motion ?: return@mapNotNull null
         val seasonTitle = entry.optString("seasonTitle").trim()
         if (!validId.matches(id) || name.isBlank() || portrait !in files || seasonTitle.isBlank()) return@mapNotNull null
         val tone = if (entry.optString("tone") == "CALM") CompanionTone.CALM else CompanionTone.WARM
         CompanionPreview(CompanionProfile(CompanionId("preview:$id"), name, name.take(2), tone),
-            "$directory/$portrait", seasonTitle, "$id-idle.png".takeIf { it in files }?.let { "$directory/$it" })
+            "$directory/$portrait", seasonTitle, motion?.let { "$directory/$it" })
     }.distinctBy { it.profile.id }
 }

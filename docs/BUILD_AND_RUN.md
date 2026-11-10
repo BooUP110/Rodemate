@@ -5,7 +5,7 @@
 | 항목 | 현재 프로젝트 값 |
 |---|---|
 | JDK | 실제 빌드 검증21.0.4, JVM target17 |
-| Gradle / AGP / Kotlin | Wrapper8.10.2 / 8.8.2 / 2.0.0 |
+| Gradle / AGP / Kotlin | Wrapper8.13 / 8.13.2 / 2.0.0 |
 | Android SDK | compile/target35, min28, build-tools35.0.1 |
 | Compose | BOM2024.04.01 |
 | Pleos 의존성 | Production 전용 Vehicle2.3.2, vehicle-data1.1.11 |
@@ -74,16 +74,23 @@ Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형�
 
 ### 내부 콜라보 미리보기
 
-로컬 `development/collab-preview/assets/companion-previews/`에 `catalog.json`과 각 초상화를 둔다. 카탈로그는 `id`, `name`, `seasonTitle`과 선택 항목 `tone`(`WARM` 또는 `CALM`)을 담은 객체 배열이다. 초상화 파일명은 `<id>.png`로 맞춘다. `<id>-idle.png`가 있으면 동일한 크기의 2×2 칸을 왼쪽 위부터 오른쪽 아래 순으로 재생한다. 내부 시연 앱 이름은 로컬 `development/collab-preview/res/values/strings.xml`의 `app_name`으로 지정할 수 있다.
+로컬 `development/collab-preview/assets/companion-previews/`에 `catalog.json`과 각 초상화를 둔다. 카탈로그는 `id`, `name`, `seasonTitle`과 선택 항목 `tone`(`WARM` 또는 `CALM`)을 담은 객체 배열이다. `<id>.png` 또는 `<id>-idle.png`를 사용한다. 동작 파일의 2×2 칸은 왼쪽 위부터 오른쪽 아래 순으로 재생한다. 내부 시연 앱 이름은 로컬 `development/collab-preview/res/values/strings.xml`의 `app_name`으로 지정할 수 있다.
+
+시즌 화면의 일러스트는 로컬 `development/collab-preview/assets/pass-worlds/`에 `travel.jpg`, `stars.jpg`, `coast.jpg`, `post.jpg`로 둔다. 해당 이미지가 없는 빌드는 테마별 그라데이션 배경을 사용한다.
 
 ~~~powershell
-.\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:packageInternalCollab
+.\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:mergeDemoDebugAssets --rerun :app:packageInternalCollab
 ~~~
 
 내부 APK는 `development/collab-preview/apk/roadmate-collab-debug.apk`에 복사되고 앱 ID는 `io.booup.roadmate.demo.collab`이다. 로컬 `development/`는 Git 제외 경로다. 내부 이미지가 담긴 APK는 가상 콜라보 시연용으로 관리한다.
 
 ### 탐험 지도와 엽서 시연
 
-정차 홈에서 동반자를 선택한다. **탐험 지도 → 지역 선택 → 방문 시연**으로 약 10초 분량의 합성 트립을 재생한다. 정차 후 해당 구역과 엽서가 열리고, 완료된 트립과 발급된 엽서가 시즌 원장에 반영된다. **엽서 컬렉션**에서 엽서를 펼치고 **시즌 패스**에서 보상을 받는다. 프리미엄 체험은 내부 시연에서만 켤 수 있다. 지도는 시·군·구 방문 기록으로 안개를 걷고, 위치가 확인되지 않은 구역은 가려 둔다. Production의 위치 응답 검증과 경로 격자 수집은 별도 단계다.
+1. **탐험 지도 → 지역 선택 → 방문 시연**으로 합성 트립을 재생한다. 정차 후 발견 리포트, 해당 구역과 엽서가 열리고 첫 방문 XP가 세 테마 패스에 공유된다.
+2. **여행 엽서 펼치기 → 별 스탬프 붙이기**로 미션 보드 첫 줄을 완성한다. **시즌 패스 → 미션 보드**에서 미보유 패스권 한 종을 선택한다.
+3. **시즌 패스**에서 일러스트 포스터를 눌러 해당 패스에 들어간다. 화면 아래 여행 리본의 레벨 표식을 누르면 무료·프리미엄 보상이 열린다. **패스권 뽑기**에서 무료 시연권으로 미보유 패스를 뽑고 봉투를 연다. 강릉과 제주 엽서를 모으면 두 번째 시연권이 열린다.
+4. 네 시연 지역의 첫 방문을 기록하면 시연 설정 기준 최대 레벨에 도달한다. 보유한 프리미엄 패스에서 **Lv.5 표식 → 동반자 팩 열기 → 받기 → 로드메이트로 지정**을 누른다. 다시 방문 시연을 하면 **내 패스함**에 동반자의 첫 동행 엽서가 생긴다.
+
+시연 경로는 합성 트립에 연결된다. Production의 위치 응답과 실제 경로 격자는 별도 검증 단계다.
 
 지도는 [geoBoundaries KOR ADM2, 2020](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM2/)의 [고정 버전 단순화 경계](https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/KOR/ADM2/geoBoundaries-KOR-ADM2_simplified.geojson)를 사용한다. 원저자는 geoBoundaries와 citypopulation.de이며 라이선스는 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)이다. 앱의 `journey/korea-districts.json`은 원본 파일의 228개 피처에서 식별자와 링 좌표를 추출해 화면용으로 투영하고 반올림한 파생 자료다. 엽서 배경은 생성한 여행 일러스트다.

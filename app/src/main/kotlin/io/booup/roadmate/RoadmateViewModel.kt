@@ -18,6 +18,7 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     val state = binding.repository.context
     val developerPanel = binding.developerPanel
     val companionPreviews = binding.companionPreviews
+    val journeyGame = binding.journeyGame
     val canSimulateVisit = binding.simulateVisit != null
     private val mutableJourney = MutableStateFlow(JourneyVisitUi())
     val journey = mutableJourney.asStateFlow()
@@ -27,7 +28,10 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
         mutableJourney.value = JourneyVisitUi(place, running = true)
         viewModelScope.launch {
             var saved = false
-            try { saved = simulate(place) } finally { mutableJourney.value = JourneyVisitUi(place, saved = saved) }
+            try { saved = simulate(place) } finally {
+                mutableJourney.value = JourneyVisitUi(place, saved = saved,
+                    tripId = postDriveUiState.value.session.tripId.takeIf { saved })
+            }
         }
     }
     val parkSimulation = binding.parkSimulation
@@ -108,6 +112,18 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     fun selectCompanion(id: CompanionId) = viewModelScope.launch {
         interaction?.selectCompanion(id)
     }
+    fun restoreJourneyCompanion() {
+        journeyGame?.state?.value?.equipped?.let(::selectCompanion)
+    }
+    fun equipJourneyCompanion(id: CompanionId, onEquipped: () -> Unit = {}) = viewModelScope.launch {
+        val game = journeyGame ?: return@launch
+        if ((game.state.value.equipped == id || game.equip(id)) && interaction?.selectCompanion(id) == true) onEquipped()
+    }
+    fun equipDefaultCompanion(id: CompanionId) = viewModelScope.launch {
+        val game = journeyGame
+        if (game?.state?.value?.equipped == null || game.useDefaultCompanion()) interaction?.selectCompanion(id)
+    }
+    fun journeyAction(action: suspend JourneyGame.() -> Unit) = viewModelScope.launch { journeyGame?.action() }
     fun postDriveAction(action: suspend (io.booup.roadmate.postdrive.PostDriveCoordinator) -> Unit) = viewModelScope.launch {
         postDrive?.let { action(it) }
     }

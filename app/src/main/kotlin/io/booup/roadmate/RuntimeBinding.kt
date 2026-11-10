@@ -33,6 +33,7 @@ data class RuntimeBinding(
     val readParkedWarnings: (suspend () -> AdapterResult<List<String>>)? = null,
     val companionPreviews: List<CompanionPreview> = emptyList(),
     val simulateVisit: (suspend (JourneyPlace) -> Boolean)? = null,
+    val journeyGame: JourneyGame? = null,
 ) {
     init { require(presentationTickMillis > 0) }
 }

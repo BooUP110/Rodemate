@@ -48,12 +48,14 @@ internal fun artwork(path: String?): ImageBitmap? {
 
 @Composable
 fun CompanionPreviewPortrait(preview: CompanionPreview, modifier: Modifier = Modifier, animate: Boolean = true) = key(preview.profile.id) {
-    val atlas = artwork(if (animate) preview.idleAtlas else null)
+    val atlas = artwork(if (animate || preview.portrait == preview.idleAtlas) preview.idleAtlas else null)
     val still = artwork(if (atlas == null) preview.portrait else null)
     val description = "${preview.profile.displayName} · 콜라보 초상화"
     if (atlas != null) {
         var frame by remember(atlas) { mutableIntStateOf(0) }
-        LaunchedEffect(atlas) {
+        LaunchedEffect(atlas, animate) {
+            frame = 0
+            if (!animate) return@LaunchedEffect
             while (true) {
                 delay(1_350)
                 for (next in listOf(1, 2, 3, 0)) { frame = next; delay(if (next == 2) 180 else 145) }

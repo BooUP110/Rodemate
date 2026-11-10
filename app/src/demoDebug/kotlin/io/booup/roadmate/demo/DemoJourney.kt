@@ -1,6 +1,7 @@
 package io.booup.roadmate.demo
 
 import io.booup.roadmate.CompanionPreview
+import io.booup.roadmate.JOURNEY_SEASON_ID
 import io.booup.roadmate.JourneyPlace
 import io.booup.roadmate.model.*
 import io.booup.roadmate.postdrive.PostDriveCoordinator
@@ -18,10 +19,10 @@ internal class DemoJourney(private val adapter: DemoVehicleAdapter, private val 
         return RegionEvidence(trip.tripId, place.id, place.name, RegionEvidenceSource.DEMO, end, true)
     }
 
-    suspend fun visit(place: JourneyPlace, post: PostDriveCoordinator): Boolean {
+    suspend fun visit(place: JourneyPlace, post: PostDriveCoordinator, repeatVisit: Boolean = false): Boolean {
         if (!post.controlsAllowed()) return false
         val state = trips.uiState.value
-        if (state.storage.visits.any { it.regionId == place.id }) return true
+        if (!repeatVisit && state.storage.visits.any { it.regionId == place.id }) return true
         if (state.storage.consents[ConsentScope.TRIP_HISTORY]?.granted != true && !post.consent(ConsentScope.TRIP_HISTORY, true)) return false
         val previous = state.runtime.completed?.tripId
         adapter.startJourneyTrip()
@@ -42,7 +43,7 @@ internal class DemoJourney(private val adapter: DemoVehicleAdapter, private val 
 }
 
 internal fun journeySeason(preview: CompanionPreview): Season = LocalSeasonCatalog.first.copy(
-    seasonId = "roadmate-collab-journey-1", title = preview.seasonTitle,
+    seasonId = JOURNEY_SEASON_ID, title = preview.seasonTitle,
     levels = listOf(0L, 15L, 30L, 45L, 60L),
     config = ProgressConfig(tripXp = 5, postcardXp = 10, postDriveXp = 5),
     rewards = listOf(

@@ -47,9 +47,9 @@ import io.booup.roadmate.postdrive.RegionEvidenceProvider
 object RuntimeBindings {
     val runtimePermissions: List<String> = emptyList()
     fun create(context: android.content.Context, scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null): RuntimeBinding =
-        create(scope, clock, storageRoot, localCompanionPreviews(context.assets))
+        create(scope, clock, storageRoot, localCompanionPreviews(context.assets), context)
     fun create(scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null,
-        previews: List<CompanionPreview> = emptyList()): RuntimeBinding {
+        previews: List<CompanionPreview> = emptyList(), appContext: android.content.Context? = null): RuntimeBinding {
         val adapter = DemoVehicleAdapter(clock).apply { select(DemoScenarioId.A_NORMAL) }
         val repository = VehicleContextStore(adapter, RuntimeMode.DEMO, clock, scope)
         val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-demo"), RuntimeMode.DEMO) }
@@ -64,6 +64,8 @@ object RuntimeBindings {
         val progress=post?.let { ProgressCoordinator(requireNotNull(storage),RuntimeMode.DEMO,clock,{it.controlsAllowed()},
             initialSeasons = previews.firstOrNull()?.let { preview -> listOf(journeySeason(preview)) }.orEmpty(),
             catalog = if (journey == null) ProgressDemoScenarios.catalog else null, seedOnlyWhenEmpty = journey != null) }
+        val game = if (journey != null && appContext != null && progress != null)
+            localJourneyGame(appContext, progress, post, clock) else null
         val progressController=progress?.let { ProgressDemoController(adapter,requireNotNull(trips),requireNotNull(storage),storage,requireNotNull(post),it,clock,scope) }
         val input = DemoLaunchInput(adapter, repository, clock, scope, controller, postController,progressController)
         return RuntimeBinding(
@@ -78,7 +80,12 @@ object RuntimeBindings {
             onLaunch = { intent -> input.fromHost(intent.getStringExtra("roadmate.demo.scenario")) },
             parkSimulation = { adapter.select(DemoScenarioId.A_NORMAL) },
             companionPreviews = previews,
-            simulateVisit = if (journey != null && post != null) { place -> journey.visit(place, post) } else null,
+            simulateVisit = if (journey != null && post != null) { place ->
+                journey.visit(place, post, repeatVisit = game?.state?.value?.equipped != null).also { saved ->
+                    if (saved && game != null) post.uiState.value.session.tripId?.let { game.remember(place, it) }
+                }
+            } else null,
+            journeyGame = game,
         )
     }
 }
