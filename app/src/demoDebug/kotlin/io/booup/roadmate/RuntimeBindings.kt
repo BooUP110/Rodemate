@@ -23,6 +23,7 @@ import io.booup.roadmate.demo.DemoLaunchInput
 import io.booup.roadmate.demo.DemoSimulationFeedback
 import io.booup.roadmate.care.DeterministicCareEngine
 import io.booup.roadmate.model.ContextClock
+import io.booup.roadmate.model.RegionEvidenceSource
 import io.booup.roadmate.model.RuntimeMode
 import kotlinx.coroutines.CoroutineScope
 import java.io.File
@@ -42,6 +43,7 @@ import io.booup.roadmate.demo.ProgressDemoId
 import io.booup.roadmate.demo.ProgressDemoScenarios
 import io.booup.roadmate.demo.ProgressDemoController
 import io.booup.roadmate.progress.ProgressCoordinator
+import io.booup.roadmate.progress.SafeProgressEngine
 import io.booup.roadmate.postdrive.RegionEvidenceProvider
 
 object RuntimeBindings {
@@ -56,18 +58,19 @@ object RuntimeBindings {
         val adapter = DemoVehicleAdapter(clock).apply { select(DemoScenarioId.A_NORMAL) }
         val repository = VehicleContextStore(adapter, RuntimeMode.DEMO, clock, scope)
         val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-demo"), RuntimeMode.DEMO,
+            progressEngine = SafeProgressEngine(explorationRewards = true),
             encryption = requireNotNull(encryption)) }
         val trips = storage?.let { TripCoordinator(it,
             RuntimeMode.DEMO, clock, TripIdSource { UUID.randomUUID().toString() }, TripConfig(TripDemoScenarios.START_MILLIS, TripDemoScenarios.STOP_MILLIS)) }
         val controller = trips?.let { DemoTripController(adapter, it, clock, scope) }
-        val journey = trips?.takeIf { previews.isNotEmpty() }?.let { DemoJourney(adapter, it) }
+        val journey = trips?.let { DemoJourney(adapter, it) }
         val post = trips?.let { PostDriveCoordinator(it, requireNotNull(storage), RuntimeMode.DEMO, clock,
             { repository.context.value }, RegionEvidenceProvider { trip -> journey?.evidence(trip) ?: ProgressDemoScenarios.region(adapter.progressSelection.value,trip)
                 ?: PostDriveDemoScenarios.region(adapter.postDriveSelection.value,trip) }) }
         val postController = post?.let { PostDriveDemoController(adapter, requireNotNull(trips), it, requireNotNull(storage), scope) }
         val progress=post?.let { ProgressCoordinator(requireNotNull(storage),RuntimeMode.DEMO,clock,{it.controlsAllowed()},
-            initialSeasons = previews.firstOrNull()?.let { preview -> listOf(journeySeason(preview)) }.orEmpty(),
-            catalog = if (journey == null) ProgressDemoScenarios.catalog else null, seedOnlyWhenEmpty = journey != null) }
+            initialSeasons = listOf(journeySeason(previews.firstOrNull())),
+            catalog = if (previews.isEmpty()) ProgressDemoScenarios.catalog else null, seedOnlyWhenEmpty = true) }
         val game = if (journey != null && appContext != null && progress != null)
             localJourneyGame(appContext, progress, post, clock) else null
         val progressController=progress?.let { ProgressDemoController(adapter,requireNotNull(trips),requireNotNull(storage),storage,requireNotNull(post),it,clock,scope) }
@@ -85,8 +88,14 @@ object RuntimeBindings {
             onLaunch = { intent -> input.fromHost(intent.getStringExtra("roadmate.demo.scenario")) },
             parkSimulation = { adapter.select(DemoScenarioId.A_NORMAL) },
             companionPreviews = previews,
-            simulateVisit = if (journey != null && post != null) { place ->
-                journey.visit(place, post, repeatVisit = game?.state?.value?.equipped != null).also { saved ->
+            simulateVisit = if (journey != null && post != null) visit@{ requested ->
+                val place = journeyPlace(requested.id) ?: return@visit false
+                val route = Expedition.containing(place.id) ?: return@visit false
+                val visits = trips.repository.state.value.visits.filter { it.source == RegionEvidenceSource.DEMO }
+                    .map { it.regionId }.toSet()
+                if (place.id != route.region.id && route.revealed(visits).none { it.id == place.id }) return@visit false
+                val repeat = place.id in visits && (place.id != route.region.id || game?.state?.value?.equipped != null)
+                journey.visit(place, post, repeatVisit = repeat).also { saved ->
                     if (saved && game != null) post.uiState.value.session.tripId?.let { game.remember(place, it) }
                 }
             } else null,

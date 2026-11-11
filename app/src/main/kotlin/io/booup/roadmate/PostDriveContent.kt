@@ -1,9 +1,11 @@
 package io.booup.roadmate
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
@@ -28,13 +30,12 @@ fun PostDriveContent(viewModel: RoadmateViewModel, openAlbum: ((JourneyPlace?) -
     var deleteTarget by remember { mutableStateOf<String?>(null) }
     var memoryConfirmation by remember(state.session.tripId) { mutableStateOf<TripReflection?>(null) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("드라이브 기억", style = MaterialTheme.typography.headlineMedium)
-        Text("함께 달린 순간을, 확인된 기록과 직접 남긴 이야기로 간직해요.", style = MaterialTheme.typography.bodyMedium)
+        RoadmateStoryHeader("드라이브 기억", "함께 달린 순간과 직접 남긴 이야기를 모아요.", "drive-memory.png", 2)
         StorageNotice(state.error)
         MemoryRecallContent(viewModel)
         state.session.card?.let { card ->
             val entry = trip.storage.postcards.firstOrNull { it.sourceTripId == card.tripId }
-            val place = journeyPlaces.firstOrNull { it.id == entry?.key?.regionId }
+            val place = journeyPlace(entry?.key?.regionId)
             RoadmateCard(tinted = true) {
                 RoadmateBadge(if (card.source == DataSource.SIMULATED) "SIMULATED · 기억 카드" else "기억 카드")
                 Text(UiCopy.date(card.startedAtEpochMillis), style = MaterialTheme.typography.titleLarge)
@@ -73,7 +74,7 @@ fun PostDriveContent(viewModel: RoadmateViewModel, openAlbum: ((JourneyPlace?) -
             state.session.postcard?.let { postcard ->
                 RoadmateCard {
                     RoadmateBadge(if (postcard.source == RegionEvidenceSource.DEMO) "SIMULATED · 지역 엽서" else "지역 엽서")
-                    val destination = journeyPlaces.firstOrNull { it.id == postcard.key.regionId }
+                    val destination = journeyPlace(postcard.key.regionId)
                     if (destination != null) {
                         PostcardArtwork(destination, artwork("journey/postcards.png"), preview, Modifier.fillMaxWidth().height(210.dp),
                             animate = state.session.reveal, companion = care.companion)
@@ -136,9 +137,16 @@ fun PostDriveContent(viewModel: RoadmateViewModel, openAlbum: ((JourneyPlace?) -
         }
         Text("저장된 드라이브", style = MaterialTheme.typography.titleLarge)
         if (state.trips.isEmpty()) RoadmateCard {
-            Text("아직 저장된 드라이브가 없어요.", style = MaterialTheme.typography.titleMedium)
-            Text(if (state.historyEnabled) "드라이브가 완료되면 이곳에 모여요." else "기록 저장은 기본으로 꺼져 있어요. 설정에서 원할 때 켤 수 있어요.",
-                style = MaterialTheme.typography.bodyMedium)
+            val emptyArt = artwork("journey/design/drive-empty.png")
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (emptyArt != null) Image(emptyArt, null, Modifier.size(82.dp))
+                else Text("✧", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.headlineLarge)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("아직 저장된 드라이브가 없어요.", style = MaterialTheme.typography.titleMedium)
+                    Text(if (state.historyEnabled) "드라이브가 완료되면 이곳에 모여요." else "기록 저장은 기본으로 꺼져 있어요. 설정에서 원할 때 켤 수 있어요.",
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
         trip.runtime.completed?.takeIf { record -> state.trips.none { it.tripId == record.tripId } }?.let { record ->
             OutlinedButton(onClick = { viewModel.postDriveAction { it.open(record.tripId) } },
@@ -207,13 +215,12 @@ fun RecordSettingsContent(viewModel: RoadmateViewModel) {
     if (!state.contentAllowed) return
     var confirmation by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("나의 동행 설정", style = MaterialTheme.typography.headlineMedium)
-        Text("기록은 이 기기에만 보관해요. 저장할지는 직접 선택해 주세요.", style = MaterialTheme.typography.bodyMedium)
+        RoadmateStoryHeader("나의 동행 설정", "차량 케어와 기록 저장", "home-parked.png", 3)
         StorageNotice(state.error)
         ComfortSettingsContent(viewModel)
         RoadmateCard {
             Text("드라이브 기록", style = MaterialTheme.typography.titleLarge)
-            Text(if (state.historyEnabled) "저장 켜짐" else "저장 꺼짐", style = MaterialTheme.typography.bodyLarge)
+            RoadmateBadge(if (state.historyEnabled) "저장 켜짐" else "저장 꺼짐")
             Text("완료된 드라이브와 직접 저장한 회고를 보관해요. 끄면 저장된 기록·회고·연결된 기억을 지워요.",
                 style = MaterialTheme.typography.bodyMedium)
             Button(onClick = { if (state.historyEnabled) confirmation = "history-off" else
@@ -222,7 +229,7 @@ fun RecordSettingsContent(viewModel: RoadmateViewModel) {
         }
         RoadmateCard {
             Text("별도 기억", style = MaterialTheme.typography.titleLarge)
-            Text(if (state.memoryEnabled) "허용됨" else "허용하지 않음")
+            RoadmateBadge(if (state.memoryEnabled) "허용됨" else "허용하지 않음")
             Text("회고에서 한 번 더 확인한 이야기만 별도로 기억해요. 이 설정만 켜거나 회고를 저장했다고 자동으로 기억하지 않아요.",
                 style = MaterialTheme.typography.bodyMedium)
             OutlinedButton(onClick = { if (state.memoryEnabled) confirmation = "memory-off" else
@@ -238,7 +245,7 @@ fun RecordSettingsContent(viewModel: RoadmateViewModel) {
                         label = { Text(profile.displayName) }, modifier = Modifier.heightIn(min = 56.dp))
                 }
             }
-            Text("오리지널 임시 이름과 디자인이에요. 동반자가 바뀌어도 안전 안내와 우선순위는 같아요.",
+            Text("동반자가 바뀌어도 안전 안내와 우선순위는 같아요.",
                 style = MaterialTheme.typography.bodyMedium)
         }
         Text("현재 안내는 기능 설정을 위한 문안이에요. 최종 개인정보 안내는 검토 중이에요.", style = MaterialTheme.typography.bodyMedium)

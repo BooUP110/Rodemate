@@ -79,9 +79,11 @@ object RuntimeBindings {
         encryption: io.booup.roadmate.storage.StorageEncryption?): RuntimeBinding {
         val context = VehicleContextStore(adapter, RuntimeMode.PRODUCTION, clock, scope)
         val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-production"), RuntimeMode.PRODUCTION,
+            progressEngine = io.booup.roadmate.progress.SafeProgressEngine(explorationRewards = true),
             encryption = requireNotNull(encryption)) }
         val trips = storage?.let { TripCoordinator(it, RuntimeMode.PRODUCTION, clock, TripIdSource { UUID.randomUUID().toString() }) }
-        val post=trips?.let { PostDriveCoordinator(it,requireNotNull(storage),RuntimeMode.PRODUCTION,clock,{context.context.value}) }
+        val post=trips?.let { PostDriveCoordinator(it, requireNotNull(storage), RuntimeMode.PRODUCTION, clock,
+            { context.context.value }, io.booup.roadmate.postdrive.RegionEvidenceProvider(::verifiedExpeditionArrival)) }
         return RuntimeBinding(context,
         careEngine = DeterministicCareEngine(clock),
         clock = clock,

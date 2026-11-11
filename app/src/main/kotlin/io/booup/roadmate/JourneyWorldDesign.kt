@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,14 +48,13 @@ internal fun WorldBackdrop(world: JourneyWorld, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun WorldEyebrow(text: String, color: Color, modifier: Modifier = Modifier) {
-    Text(text, modifier, color = color, fontSize = 11.sp, lineHeight = 16.sp,
-        fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+    Text(text, modifier, color = color,
+        style = RoadmateType.caption.copy(fontWeight = FontWeight.SemiBold, letterSpacing = .25.sp))
 }
 
 @Composable
 internal fun WorldTitle(text: String, color: Color, modifier: Modifier = Modifier) {
-    Text(text, modifier, color = color, fontSize = 30.sp, lineHeight = 37.sp,
-        fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+    Text(text, modifier, color = color, style = RoadmateType.heading)
 }
 
 @Composable
@@ -67,7 +65,7 @@ internal fun WorldAction(label: String, world: JourneyWorld, onClick: () -> Unit
         colors = ButtonDefaults.buttonColors(containerColor = if (primary) world.accent else world.paper,
             contentColor = if (primary) Color.White else world.deep),
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp, lineHeight = 21.sp))
+        Text(label, style = RoadmateType.control.copy(fontSize = 16.sp, lineHeight = 22.sp))
     }
 }
 

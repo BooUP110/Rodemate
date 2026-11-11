@@ -38,6 +38,9 @@ data class JourneyGameState(
     val equippedAt: Long = 0,
     val memories: List<JourneyMemory> = emptyList(),
     val progressResetAt: Long = -1,
+    val landmarks: List<ExpeditionLandmark> = emptyList(),
+    val moonlightCompleted: Int = 0,
+    val moonlightOutfit: String? = null,
 )
 
 internal val coastalPlaces = listOf(journeyPlaces[1], journeyPlaces[3])
@@ -77,6 +80,9 @@ class JourneyGame(private val storage: () -> TripStorageState,
             memories = visibleMemories(current),
             openedCards = current.openedCards.intersect(owned),
             starredCards = current.starredCards.intersect(owned),
+            landmarks = current.landmarks.filter { landmark ->
+                Expedition.containing(landmark.pointId)?.demoRank(stored.visits) != null
+            },
         )
         if (next == current) return@withLock false
         // Apply privacy removal in memory even if disk persistence is temporarily unavailable.
@@ -90,6 +96,7 @@ class JourneyGame(private val storage: () -> TripStorageState,
 
     fun stamps(current: JourneyGameState, owned: Set<RegionId> = ownedCards()): Set<JourneyStamp> {
         val post = storage().postDrive.values
+        val regions = journeyRegionIds(owned)
         return buildSet {
             if (owned.isNotEmpty()) add(JourneyStamp.DISCOVERY)
             if (owned.any { it.value in current.openedCards }) add(JourneyStamp.OPEN)
@@ -97,9 +104,9 @@ class JourneyGame(private val storage: () -> TripStorageState,
             if (post.any { it.reviewed }) add(JourneyStamp.REVIEW)
             if (post.any { it.reflection != null }) add(JourneyStamp.NOTE)
             if (current.checkedCare) add(JourneyStamp.CARE)
-            if (coastalPlaces.any { it.id in owned }) add(JourneyStamp.COAST)
+            if (coastalPlaces.any { it.id in regions }) add(JourneyStamp.COAST)
             if (owned.size >= 2) add(JourneyStamp.TWO)
-            if (journeyPlaces.count { it.id in owned } >= 2) add(JourneyStamp.SECRET)
+            if (regions.size >= 2) add(JourneyStamp.SECRET)
         }
     }
 
@@ -112,7 +119,8 @@ class JourneyGame(private val storage: () -> TripStorageState,
 
     fun candidates(current: JourneyGameState) = JourneyPass.entries.filter { pass -> current.grants.none { it.pass == pass } }
     fun tickets(current: JourneyGameState, owned: Set<RegionId> = ownedCards()) =
-        (1 + (if (coastalPlaces.all { it.id in owned }) 1 else 0) - current.grants.count { it.drawn }).coerceAtLeast(0)
+        (1 + (if (journeyRegionIds(owned).containsAll(coastalPlaces.map { it.id })) 1 else 0) -
+            current.grants.count { it.drawn }).coerceAtLeast(0)
     fun canChoose(current: JourneyGameState, stamps: Set<JourneyStamp>) = current.grants.none { !it.drawn } && hasLine(stamps)
 
     suspend fun draw(): JourneyPass? = mutex.withLock {
@@ -138,7 +146,26 @@ class JourneyGame(private val storage: () -> TripStorageState,
     suspend fun careChecked() = update { it.copy(checkedCare = true) }
 
     suspend fun claimSet() = update { current ->
-        if (coastalPlaces.all { it.id in ownedCards() }) current.copy(claimed = current.claimed + "coast-set") else current
+        if (journeyRegionIds(ownedCards()).containsAll(coastalPlaces.map { it.id })) current.copy(claimed = current.claimed + "coast-set") else current
+    }
+
+    suspend fun createLandmark(pointId: RegionId, name: String) = update { current ->
+        val route = Expedition.containing(pointId) ?: return@update current
+        val rank = route.demoRank(storage().visits) ?: return@update current
+        val title = name.trim()
+        if (rank > 3 || route.places.none { it.id == pointId } || title.length !in 2..24 || title.any(Char::isISOControl) ||
+            current.landmarks.any { Expedition.containing(it.pointId) == route }) return@update current
+        current.copy(landmarks = current.landmarks + ExpeditionLandmark(pointId, title))
+    }
+
+    suspend fun demoLandmarkFeedback(pointId: RegionId, visitor: Int, like: Boolean) = update { current ->
+        if (visitor !in 1..3) return@update current
+        current.copy(landmarks = current.landmarks.map { landmark ->
+            if (landmark.pointId != pointId) landmark
+            else if (!like) landmark.copy(visitors = landmark.visitors + visitor)
+            else if (visitor !in landmark.visitors) landmark
+            else landmark.copy(likes = landmark.likes + visitor)
+        })
     }
 
     suspend fun claim(pass: JourneyPass, tier: Int, premium: Boolean, companion: CompanionId? = null) = update { current ->
@@ -157,6 +184,29 @@ class JourneyGame(private val storage: () -> TripStorageState,
     }
 
     suspend fun useDefaultCompanion() = update { it.copy(equipped = null, equippedAt = 0) }
+
+    internal suspend fun completeMoonlightChapter(chapter: MoonlightChapter, answer: Int) = mutex.withLock {
+        val current = data.value
+        if (!controlsAllowed() || answer != chapter.answer || chapter.ordinal > current.moonlightCompleted ||
+            storage().visits.none { it.regionId == chapter.place.id && it.source == RegionEvidenceSource.DEMO }) return@withLock false
+        if (chapter.ordinal < current.moonlightCompleted) true
+        else save(current.copy(moonlightCompleted = current.moonlightCompleted + 1))
+    }
+
+    internal suspend fun grantDemoMoonlightPremium() = update { current ->
+        current.copy(claimed = current.claimed + MOONLIGHT_DEMO_PREMIUM)
+    }
+
+    internal suspend fun claimMoonlightOutfit(outfit: MoonlightOutfit) = update { current ->
+        if (current.moonlightCompleted < outfit.chapter ||
+            (outfit.premium && MOONLIGHT_DEMO_PREMIUM !in current.claimed)) current
+        else current.copy(claimed = current.claimed + outfit.claimKey)
+    }
+
+    internal suspend fun equipMoonlightOutfit(outfit: MoonlightOutfit?) = update { current ->
+        if (outfit == null || outfit.claimKey in current.claimed) current.copy(moonlightOutfit = outfit?.name)
+        else current
+    }
 
     suspend fun remember(place: JourneyPlace, tripId: String) = update { current ->
         val companion = current.equipped ?: return@update current

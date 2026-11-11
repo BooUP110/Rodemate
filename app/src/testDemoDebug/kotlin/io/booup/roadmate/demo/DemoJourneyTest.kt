@@ -1,6 +1,8 @@
 package io.booup.roadmate.demo
 
 import io.booup.roadmate.CompanionPreview
+import io.booup.roadmate.Expedition
+import io.booup.roadmate.JourneyPlace
 import io.booup.roadmate.RuntimeBindings
 import io.booup.roadmate.journeyPlaces
 import io.booup.roadmate.model.*
@@ -19,6 +21,14 @@ class DemoJourneyTest {
     @get:Rule val temporary = TemporaryFolder()
 
     @Test fun visitUnlocksOneDistrictAndOnePostcardAndAdvancesSeason() = runTest {
+        verifyVisit(journeyPlaces.first(), expectedXp = 15, waypoint = false)
+    }
+
+    @Test fun firstWaypointWritesArrivalAndBonusButRejectsAHiddenDestination() = runTest {
+        verifyVisit(Expedition.SEOUL.places.first(), expectedXp = 35, waypoint = true)
+    }
+
+    private suspend fun TestScope.verifyVisit(place: JourneyPlace, expectedXp: Long, waypoint: Boolean) {
         val epoch = Instant.parse("2026-11-10T00:00:00Z").toEpochMilli()
         val clock = ContextClock { ObservationTime(epoch + testScheduler.currentTime, 100_000 + testScheduler.currentTime) }
         val preview = CompanionPreview(CompanionProfiles.dodam, "portrait.png", "테스트 시즌")
@@ -32,7 +42,7 @@ class DemoJourneyTest {
         trips.update(binding.repository.context.value, CareDecision())
         assertTrue(post.consent(ConsentScope.TRIP_HISTORY, true))
 
-        val place = journeyPlaces.first()
+        if (waypoint) assertFalse(visit(Expedition.SEOUL.places.last()))
         val result = async { visit(place) }
         runCurrent()
         val samples = mutableListOf<String>()
@@ -52,11 +62,11 @@ class DemoJourneyTest {
         advanceTimeBy(1_200); runCurrent()
         runBlocking { trips.update(binding.repository.context.value, CareDecision()) }
         assertTrue("A duplicate is tried after fresh parked observations resume", post.controlsAllowed())
-        assertTrue(visit(place))
+        if (waypoint) assertFalse(visit(Expedition.SEOUL.places.last())) else assertTrue(visit(place))
         assertEquals(1, trips.repository.state.value.postcards.size)
         runBlocking { progress.refresh() }
         val active = requireNotNull(progress.uiState.value.active)
-        assertEquals(15L, active.progress.totalXp)
+        assertEquals(expectedXp, active.progress.totalXp)
         assertTrue(active.missions.any { it.visible && it.completed && it.mission.missionId == "first-postcard" })
         runBlocking {
             progress.previewPremium(active.season.seasonId, true)

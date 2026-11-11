@@ -52,6 +52,18 @@ class ProgressEngineTest {
         val xp=listOf(short,long).map { t -> engine.award(ProgressData(),season(),ProgressEventFactory().events(TripStorageState(trips=listOf(t))).single(),now(),RuntimeMode.DEMO)!!.awardedXp }
         assertEquals(listOf(20L,20L),xp)
     }
+    @Test fun expeditionAddsBoundedMileageAndAwardsTheFirstWaypointOnce() {
+        val expedition = SafeProgressEngine(explorationRewards = true)
+        val s = season(config = ProgressConfig(tripXp = 5, tripCap = 10, dailyCap = 10))
+        val trip = event().copy(distanceMeters = 400_000)
+        val point = event("${EXPEDITION_POINT_PREFIX}seoul:first", ProgressEventType.FIRST_REGION_VISIT).copy(tripId = trip.tripId)
+        val region = event("legacy-district", ProgressEventType.FIRST_REGION_VISIT).copy(tripId = trip.tripId)
+        val data = ProgressData().add(expedition, s, trip).add(expedition, s, point).add(expedition, s, region)
+        assertEquals(listOf(10L, 20L, 0L), data.ledger.map { it.awardedXp })
+        assertEquals(data, data.add(expedition, s, point.copy(tripId = "another-trip")))
+        assertEquals(5L, ProgressData().add(expedition, s, event()).ledger.single().awardedXp)
+        assertNull(expedition.award(ProgressData(), s, point, now(), RuntimeMode.PRODUCTION))
+    }
     @Test fun dailyCapLimitsRepeatTripsWithoutNegativeOrFailureXp() {
         val s=season(config=ProgressConfig(dailyCap=45)); var d=ProgressData()
         repeat(4) { d=d.add(engine,s,event("trip-$it")) }

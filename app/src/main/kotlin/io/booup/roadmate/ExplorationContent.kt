@@ -1,228 +1,269 @@
 package io.booup.roadmate
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.booup.roadmate.model.RegionEvidenceSource
-import io.booup.roadmate.model.RegionId
-import io.booup.roadmate.model.RuntimeMode
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-
-private data class District(val id: RegionId, val rings: List<FloatArray>)
-private data class MapGeometry(val districts: List<District>, val bounds: Rect, val provinces: Map<String, List<RegionId>>) {
-    fun project(point: Offset, canvas: Size, inset: Float): Offset {
-        val scale = minOf((canvas.width - inset * 2) / bounds.width, (canvas.height - inset * 2) / bounds.height)
-        return (point - bounds.center) * scale + Offset(canvas.width / 2, canvas.height / 2)
-    }
-}
-
-private fun readDistricts(json: String, provinceJson: String): MapGeometry {
-    val source = JSONArray(json)
-    var west = Float.POSITIVE_INFINITY; var north = Float.POSITIVE_INFINITY
-    var east = Float.NEGATIVE_INFINITY; var south = Float.NEGATIVE_INFINITY
-    val districts = List(source.length()) { index ->
-        val entry = source.getJSONArray(index)
-        val rings = entry.getJSONArray(1)
-        District(RegionId(entry.getString(0)), List(rings.length()) { ringIndex ->
-            val values = rings.getJSONArray(ringIndex)
-            FloatArray(values.length()) { axis ->
-                values.getInt(axis).toFloat().also { value ->
-                    if (axis % 2 == 0) { west = minOf(west, value); east = maxOf(east, value) }
-                    else { north = minOf(north, value); south = maxOf(south, value) }
-                }
-            }
-        })
-    }
-    val provinces = JSONArray(provinceJson)
-    val grouped = (0 until provinces.length()).associate { index ->
-        val province = provinces.getJSONArray(index)
-        val ids = province.getJSONArray(1)
-        province.getString(0) to List(ids.length()) { RegionId(ids.getString(it)) }
-    }
-    return MapGeometry(districts, Rect(west, north, east, south), grouped)
-}
+import io.booup.roadmate.model.*
+import io.booup.roadmate.trip.TripEvidenceMapper
 
 @Composable
-fun ExplorationContent(viewModel: RoadmateViewModel, mode: RuntimeMode, initialPlace: JourneyPlace?,
-    openCollection: (JourneyPlace?) -> Unit, openMemory: () -> Unit, openSeason: () -> Unit, onSimulate: (JourneyPlace) -> Unit) {
+fun ExplorationContent(viewModel: RoadmateViewModel, context: VehicleContext, initialPlace: JourneyPlace?,
+    openCollection: (JourneyPlace?) -> Unit, openMemory: () -> Unit, openSeason: () -> Unit,
+    onSimulate: (JourneyPlace) -> Unit) {
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
     val journey by viewModel.journey.collectAsStateWithLifecycle()
     val progress by viewModel.progressUiState.collectAsStateWithLifecycle()
     val game = viewModel.journeyGame
     val gameState = game?.state?.collectAsStateWithLifecycle()?.value
-    val expected = if (mode == RuntimeMode.DEMO) RegionEvidenceSource.DEMO else RegionEvidenceSource.VERIFIED_CONTEXT
-    val visits = trip.storage.visits.filter { it.source == expected }.map { it.regionId }.toSet()
-    val assets = LocalContext.current.assets
-    var failed by remember { mutableStateOf(false) }
-    val map by produceState<MapGeometry?>(null, assets) {
-        val result = withContext(Dispatchers.IO) {
-            runCatching { readDistricts(
-                assets.open("journey/korea-districts.json").bufferedReader().use { it.readText() },
-                assets.open("journey/korea-provinces.json").bufferedReader().use { it.readText() },
-            ) }
-        }
-        value = result.getOrNull()
-        failed = result.isFailure
-    }
-    var selected by remember(initialPlace) { mutableStateOf(initialPlace ?: journeyPlaces.first()) }
-    val discovered = map?.districts?.count { it.id in visits } ?: 0
-    Text("안개 너머, 우리의 한국", style = MaterialTheme.typography.headlineMedium)
-    Text("도착한 곳의 안개가 걷히고, 첫 방문 엽서가 한 장씩 모여요.", style = MaterialTheme.typography.bodyMedium)
-    if (map != null) Text("탐험한 구역 $discovered / ${map!!.districts.size}", style = MaterialTheme.typography.titleMedium)
-    if (gameState != null && journey.saved && journey.place != null) {
-        val found = requireNotNull(journey.place)
-        val xp = trip.storage.progression.ledger.filter { it.sourceTripId == journey.tripId && it.seasonId == JOURNEY_SEASON_ID }.sumOf { it.awardedXp }
-        val isFirst = trip.storage.visits.any { it.regionId == found.id && it.sourceTripId == journey.tripId }
-        RoadmateCard(tinted = true) {
-            RoadmateBadge("정차 후 발견 리포트", demo = true)
-            Text(if (isFirst) "${found.name}의 안개가 걷혔어요" else "${found.name} 드라이브를 기록했어요", style = MaterialTheme.typography.titleLarge)
-            Text(if (isFirst) "첫 방문 엽서 · ${found.title}" else "엽서 컬렉션에 이미 있는 지역이에요.")
-            Text("이번 드라이브 +$xp XP · 시즌 누적 ${progress.active?.progress?.totalXp ?: 0} XP")
-            if (gameState.memories.any { it.tripId == journey.tripId }) Text("동반자의 첫 여행 엽서가 내 패스함에 열렸어요.")
-            Button(onClick = { openCollection(found) }, modifier = Modifier.heightIn(min = 52.dp)) { Text("여행 엽서 펼치기") }
-            OutlinedButton(onClick = openMemory, modifier = Modifier.heightIn(min = 52.dp)) { Text("드라이브 회고 열기") }
-            OutlinedButton(onClick = openSeason, modifier = Modifier.heightIn(min = 52.dp)) { Text("시즌 미션과 보상 보기") }
-        }
+    val demo = context.mode == RuntimeMode.DEMO
+    val source = if (demo) RegionEvidenceSource.DEMO else RegionEvidenceSource.VERIFIED_CONTEXT
+    val visits = trip.storage.visits.filter { it.source == source }
+    val visited = visits.map { it.regionId }.toSet()
+    val atlas = artwork("journey/postcards.png")
+    var route by remember(initialPlace) { mutableStateOf(Expedition.containing(initialPlace?.id) ?: Expedition.SEOUL) }
+    val next = route.next(visited)
+    val visible = route.revealed(visited)
+    val count = route.places.count { it.id in visited }
+    var selectedId by remember(route, initialPlace) { mutableStateOf(initialPlace?.id) }
+    var originId by remember(route) { mutableStateOf<RegionId?>(null) }
+    var destinationId by remember(route) { mutableStateOf<RegionId?>(null) }
+    val selected = visible.firstOrNull { it.id == selectedId } ?: next ?: visible.last()
+    val origin = visible.firstOrNull { it.id == originId }
+    val destination = visible.firstOrNull { it.id == destinationId }
+    val connection = if (origin != null && destination != null) route.connection(origin.id, destination.id, visited) else emptyList()
+    val recent = visits.filter { visit -> visible.any { it.id == visit.regionId } }.maxByOrNull { it.firstVisitedAtEpochMillis }
+    val clock = remember { AndroidContextClock() }
+    val location = TripEvidenceMapper().map(context, clock.now()).location
+    val current = verifiedExpeditionPoint(location).takeIf { !demo && it in visible }
+    val landmark = gameState?.landmarks?.firstOrNull { Expedition.containing(it.pointId) == route && it.pointId in visited }
+
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("안개 너머, 우리의 한국", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+        progress.active?.let { RoadmateBadge("시즌 ${it.progress.totalXp} XP") }
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val chart: @Composable (Modifier) -> Unit = { modifier ->
-            RoadmateCard(modifier) {
-                val geometry = map
-                if (geometry == null) Text(if (failed) "지도 파일을 읽지 못했어요." else "한국 지도를 펼치는 중이에요.")
-                else KoreaFogMap(geometry, visits, selected, game != null) { selected = it }
-                Text("● 발견한 구역     ○ 안개 구역", style = MaterialTheme.typography.labelMedium)
-                if (game != null) Text("노란 선 · 방문 기록에 연결한 합성 시연 경로", style = MaterialTheme.typography.labelMedium)
-                Text("경계 데이터 geoBoundaries / citypopulation.de · 2020 · CC BY 3.0", style = MaterialTheme.typography.labelMedium)
-            }
-        }
-        val destinations: @Composable (Modifier) -> Unit = { modifier ->
-            RoadmateCard(modifier, tinted = true) {
-                Text("지역 기록", style = MaterialTheme.typography.titleLarge)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    journeyPlaces.take(2).forEach { place ->
-                        FilterChip(selected == place, { selected = place }, { Text(place.name) },
-                            modifier = Modifier.weight(1f).heightIn(min = 54.dp))
+        val columns = if (maxWidth >= 720.dp) 4 else 2
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Expedition.entries.chunked(columns).forEach { regions ->
+                Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    regions.forEach { region ->
+                        val completed = region.places.count { it.id in visited }
+                        RegionCard(region, atlas, completed, route == region, Modifier.weight(1f)) { route = region }
                     }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    journeyPlaces.drop(2).forEach { place ->
-                        FilterChip(selected == place, { selected = place }, { Text(place.name) },
-                            modifier = Modifier.weight(1f).heightIn(min = 54.dp))
-                    }
-                }
-                val visited = selected.id in visits
-                RoadmateBadge(if (visited) "발견 완료" else "안개 속 지역")
-                Text(if (visited) selected.title else selected.name, style = MaterialTheme.typography.titleMedium)
-                Text(if (visited) selected.note else "확인된 첫 방문이 기록되면 엽서가 열려요.")
-                if (visited) Button(onClick = { openCollection(selected) }, modifier = Modifier.heightIn(min = 56.dp)) { Text("엽서 컬렉션 열기") }
-                if (viewModel.canSimulateVisit && (!visited || gameState?.equipped != null)) {
-                    Button(onClick = { onSimulate(selected) }, enabled = !journey.running, modifier = Modifier.heightIn(min = 56.dp)) {
-                        Text("${selected.name} 방문 시연")
-                    }
-                    Text("합성 트립과 시연 기록을 이 앱에 저장해요.", style = MaterialTheme.typography.bodyMedium)
-                } else if (!visited) Text("확인된 차량 위치 기록을 기다리고 있어요.")
-                if (journey.place == selected && !journey.running) {
-                    Text(if (journey.saved) "첫 방문 엽서를 컬렉션에 넣었어요." else "방문 기록을 만들지 못했어요. 정차 상태에서 다시 시연해 주세요.")
                 }
             }
         }
-        if (maxWidth >= 950.dp) Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            chart(Modifier.weight(1.4f)); destinations(Modifier.weight(1f))
-        } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { chart(Modifier); destinations(Modifier) }
     }
-    map?.let { geometry -> RoadmateCard {
-        var expanded by remember { mutableStateOf(false) }
-        Text("광역별 탐험 진행도", style = MaterialTheme.typography.titleLarge)
-        val regions = if (expanded) geometry.provinces else geometry.provinces.filterValues { ids ->
-            ids.any { it in visits } || selected.id in ids
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp)).background(Color(0xFF283B58))) {
+        ExpeditionLandscape(route, atlas, Modifier.matchParentSize())
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(
+            Color(0xE522304B), Color(0x48283E54), Color(0xB323304B)))))
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("${route.label} 탐험", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(route.theme, Modifier.weight(1f), color = Color(0xFFFFDC9A), style = MaterialTheme.typography.labelMedium)
+                Text("$count / ${route.places.size} 방문", color = Color.White, style = MaterialTheme.typography.labelLarge)
+            }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val map: @Composable (Modifier) -> Unit = { modifier ->
+                    ExpeditionMap(route, visible, visited, selected.id, origin?.id, destination?.id, connection,
+                        landmark?.pointId, modifier.height(270.dp)) { selectedId = it.id }
+                }
+                val detail: @Composable (Modifier) -> Unit = { modifier ->
+                    RoadmateCard(modifier, compact = true) {
+                        val reached = selected.id in visited
+                        RoadmateBadge(if (reached) "✓ 방문 완료" else "✦ 다음 목표")
+                        Text(selected.name, style = MaterialTheme.typography.titleLarge)
+                        if (!reached) Text("첫 방문 보너스 +$EXPEDITION_FIRST_VISIT_XP XP",
+                            style = MaterialTheme.typography.bodySmall)
+                        if (demo && viewModel.canSimulateVisit) {
+                            Button(onClick = { onSimulate(selected) }, enabled = !journey.running,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
+                                Text(if (reached) "다시 방문 시연" else "방문 시연")
+                            }
+                        } else if (!reached) Text("확인된 방문 기록이 들어오면 다음 별이 열려요.", style = MaterialTheme.typography.bodySmall)
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { originId = selected.id }, modifier = Modifier.heightIn(min = 52.dp)) { Text("출발지로") }
+                            OutlinedButton(onClick = { destinationId = selected.id }, modifier = Modifier.heightIn(min = 52.dp)) { Text("목적지로") }
+                        }
+                    }
+                }
+                if (maxWidth >= 750.dp) Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    map(Modifier.weight(1.6f)); detail(Modifier.weight(1f))
+                } else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    map(Modifier.fillMaxWidth()); detail(Modifier.fillMaxWidth())
+                }
+            }
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                visible.forEach { place ->
+                    FilterChip(selected.id == place.id, { selectedId = place.id }, { Text(place.name) }, modifier = Modifier.heightIn(min = 48.dp),
+                        colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xEFFFFAF3), labelColor = Color(0xFF273848)))
+                }
+            }
         }
-        regions.forEach { (name, ids) -> Text("$name · ${ids.count { it in visits }} / ${ids.size} 구역") }
-        OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.heightIn(min = 52.dp)) {
-            Text(if (expanded) "방문한 광역만 보기" else "17개 광역 전체 보기")
+    }
+    RoadmateCard {
+        Text("별자리 경로", style = MaterialTheme.typography.titleMedium)
+        Text(if (connection.isNotEmpty()) connection.joinToString(" → ") { it.name }
+            else "${origin?.name ?: "출발지 선택"} → ${destination?.name ?: "목적지 선택"}")
+        Text(when {
+            connection.isNotEmpty() -> "지도 위 금색 선으로 탐험 순서를 확인하세요."
+            origin?.id != null && origin.id == destination?.id -> "서로 다른 두 지점을 선택해 주세요."
+            origin != null && destination != null -> "사이에 안개가 남아 있어요. 다음 목표를 방문하면 경로가 이어져요."
+            else -> "공개된 원을 눌러 출발지와 목적지를 정하세요."
+        }, style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (current != null) OutlinedButton({ originId = current.id }, modifier = Modifier.heightIn(min = 52.dp)) { Text("현위치를 출발지로") }
+            else if (recent != null) OutlinedButton({ originId = recent.regionId }, modifier = Modifier.heightIn(min = 52.dp)) { Text("최근 방문을 출발지로") }
+            if (origin != null || destination != null) TextButton({ originId = null; destinationId = null },
+                modifier = Modifier.heightIn(min = 52.dp)) { Text("경로 지우기") }
         }
-        Text("수집률은 앱에 포함된 2020년 시·군·구 경계 기준이에요.", style = MaterialTheme.typography.labelMedium)
-    } }
+    }
+    val found = journey.place?.takeIf { Expedition.containing(it.id) == route }
+    if (found != null && !journey.running) {
+        if (journey.saved) {
+            val entries = journey.tripId?.let { id -> trip.storage.progression.ledger.filter { it.sourceTripId == id } }.orEmpty()
+            val driveXp = entries.filter { it.sourceType == ProgressEventType.TRIP_COMPLETED }.sumOf { it.awardedXp }
+            val visitXp = entries.filter { it.sourceType == ProgressEventType.FIRST_REGION_VISIT }.sumOf { it.awardedXp }
+            val postcardXp = entries.filter { it.sourceType == ProgressEventType.POSTCARD_ACQUIRED }.sumOf { it.awardedXp }
+            RoadmateCard(tinted = true) {
+                Text("${found.name} 방문 기록", style = MaterialTheme.typography.titleMedium)
+                Text("주행 +$driveXp XP · 첫 방문 +$visitXp XP" + if (postcardXp > 0) " · 엽서 +$postcardXp XP" else "")
+                if (entries.any { it.reason in setOf(XpReason.DAILY_CAP, XpReason.TRIP_CAP) }) {
+                    Text("일부 XP에 시즌 상한이 적용됐어요.", style = MaterialTheme.typography.bodySmall)
+                }
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton({ openCollection(found) }, modifier = Modifier.heightIn(min = 52.dp)) { Text("엽서 펼치기") }
+                    TextButton(openMemory, modifier = Modifier.heightIn(min = 52.dp)) { Text("드라이브 회고") }
+                    TextButton(openSeason, modifier = Modifier.heightIn(min = 52.dp)) { Text("시즌 보상") }
+                }
+            }
+        } else RoadmateCard { Text("방문 기록을 저장하지 못했어요. 정차 상태를 확인해 주세요.") }
+    }
+    ExpeditionLandmarks(route, count, visits, landmark, demo && game != null, viewModel)
 }
 
 @Composable
-private fun KoreaFogMap(geometry: MapGeometry, visits: Set<RegionId>, selected: JourneyPlace, demoRoutes: Boolean,
-    onSelect: (JourneyPlace) -> Unit) {
-    val select by rememberUpdatedState(onSelect)
-    val sea = Color(0xFFD9EAF0)
-    val discovered = Color(0xFF69B58D)
-    val ink = Color(0xFF235D4B)
-    Canvas(Modifier.fillMaxWidth().height(392.dp).clip(RoundedCornerShape(22.dp)).background(sea)
-        .semantics { contentDescription = "한국 탐험 지도 · 방문 구역만 표시" }
-        .pointerInput(geometry) {
-            detectTapGestures { tap ->
-                val canvas = Size(size.width.toFloat(), size.height.toFloat())
-                journeyPlaces.minByOrNull { (geometry.project(it.mapPoint(), canvas, 24.dp.toPx()) - tap).getDistance() }
-                    ?.takeIf { (geometry.project(it.mapPoint(), canvas, 24.dp.toPx()) - tap).getDistance() <= 30.dp.toPx() }
-                    ?.let { select(it) }
-            }
-        }.drawWithCache {
-            val inset = 24.dp.toPx()
-            val shapes = geometry.districts.map { district ->
-                val shape = Path().apply {
-                    fillType = PathFillType.EvenOdd
-                    for (ring in district.rings) {
-                        for (i in ring.indices step 2) {
-                            val p = geometry.project(Offset(ring[i], ring[i + 1]), size, inset)
-                            if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
-                        }
-                        close()
-                    }
-                }
-                district.id to shape
-            }
-            val fog = Brush.verticalGradient(listOf(Color(0xFFE8EBF1), Color(0xFFBDC8D6), Color(0xFFE8EEF1)))
-            onDrawBehind {
-                shapes.forEach { (id, shape) ->
-                    if (id in visits) drawPath(shape, discovered) else drawPath(shape, fog)
-                    drawPath(shape, Color(0xFF8599A7), style = Stroke(0.55.dp.toPx()))
-                }
-                journeyPlaces.forEach { place ->
-                    val pin = geometry.project(place.mapPoint(), size, inset)
-                    if (demoRoutes && place.id in visits) shapes.firstOrNull { it.first == place.id }?.let { (_, area) ->
-                        clipPath(area) {
-                            val route = Path().apply {
-                                moveTo(pin.x - 19.dp.toPx(), pin.y + 13.dp.toPx())
-                                quadraticBezierTo(pin.x - 7.dp.toPx(), pin.y - 9.dp.toPx(), pin.x, pin.y)
-                            }
-                            drawPath(route, Color(0xFFFFEB9B), style = Stroke(3.dp.toPx()))
-                        }
-                    }
-                    if (place == selected) drawCircle(Color.White, 12.dp.toPx(), pin)
-                    drawCircle(if (place.id in visits) ink else Color(0xFF7B8699), 8.dp.toPx(), pin)
-                    drawCircle(if (place.id in visits) Color(0xFFF8D891) else Color(0xFFECEFF3), 3.dp.toPx(), pin)
-                }
-            }
-        }) {}
+private fun ExpeditionLandscape(route: Expedition, atlas: ImageBitmap?, modifier: Modifier) {
+    RoadmateLandscape("map-${route.asset}.png", route.postcardIndex, modifier, atlas)
 }
 
-private fun JourneyPlace.mapPoint() = Offset(((longitude - 124) * 81000).toFloat(), ((39 - latitude) * 100000).toFloat())
+@Composable
+private fun RegionCard(route: Expedition, atlas: ImageBitmap?, count: Int, selected: Boolean, modifier: Modifier, select: () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
+    Surface(modifier.height(76.dp), shape = shape,
+        border = androidx.compose.foundation.BorderStroke(if (selected) 3.dp else 1.dp,
+            if (selected) Color(0xFFECAD60) else Color(0xFFEEE0D3))) {
+        Box(Modifier.fillMaxSize().clickable(role = Role.Button, onClick = select)) {
+            ExpeditionLandscape(route, atlas, Modifier.matchParentSize())
+            Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xED233246)))))
+            Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(route.label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 24.sp)
+                Text("$count / ${route.places.size} 방문", color = Color(0xFFFFEAC9), fontSize = 14.sp, lineHeight = 18.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpeditionLandmarks(route: Expedition, count: Int, visits: List<RegionVisitRecord>,
+    landmark: ExpeditionLandmark?, demo: Boolean, viewModel: RoadmateViewModel) {
+    val rank = if (demo) route.demoRank(visits) else null
+    var creating by remember(route) { mutableStateOf(false) }
+    var name by remember(route) { mutableStateOf("") }
+    var point by remember(route) { mutableStateOf(route.places.first()) }
+    var visitor by remember(route) { mutableIntStateOf(1) }
+    var saving by remember(route) { mutableStateOf(false) }
+    var failed by remember(route) { mutableStateOf(false) }
+    val art = artwork(if (landmark != null) "journey/design/landmark-placeholder.png" else "journey/design/landmark-creator-ticket.png")
+    RoadmateCard(tinted = true) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            if (art != null) Image(art, null, Modifier.size(68.dp), contentScale = ContentScale.Fit)
+            else Text("✦", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.headlineMedium)
+            Column(Modifier.weight(1f)) {
+                Text("여행자의 랜드마크", style = MaterialTheme.typography.titleLarge)
+                Text(if (demo) "${route.label} · 순위와 반응 시연" else "${route.label} · 지역 완주 보상",
+                    style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        when {
+            landmark != null -> {
+                Text(landmark.name, style = MaterialTheme.typography.titleLarge)
+                Text(journeyPlace(landmark.pointId)?.name.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+                Text("좋아요 ${landmark.likes.size} · 방문자 ${landmark.visitors.size}명 · ${landmark.points} RP")
+                Text("시연 방문자 1명당 5 RP가 쌓여요.", style = MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (1..3).forEach { number ->
+                        FilterChip(visitor == number, { visitor = number }, { Text("시연 방문자 $number") }, modifier = Modifier.heightIn(min = 48.dp))
+                    }
+                }
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton({
+                        val person = visitor
+                        viewModel.journeyAction { demoLandmarkFeedback(landmark.pointId, person, like = false) }
+                    },
+                        enabled = visitor !in landmark.visitors, modifier = Modifier.heightIn(min = 52.dp)) { Text("방문 시연") }
+                    OutlinedButton({
+                        val person = visitor
+                        viewModel.journeyAction { demoLandmarkFeedback(landmark.pointId, person, like = true) }
+                    },
+                        enabled = visitor in landmark.visitors && visitor !in landmark.likes,
+                        modifier = Modifier.heightIn(min = 52.dp)) { Text("좋아요 시연") }
+                }
+            }
+            count < route.places.size -> Text("${route.places.size}개 지점을 모두 방문한 뒤 지역 완주 기록이 열려요.")
+            rank != null -> {
+                Text("지역 완주 · 시연 순위 ${rank}위", style = MaterialTheme.typography.titleMedium)
+                Text(if (rank <= 3) "완주 상위 3명에게 생성권 한 장이 열려요." else "이 시연에서는 완주 상위 3명에게 생성권을 줘요.")
+                if (rank <= 3) Button({ creating = true; failed = false }, modifier = Modifier.heightIn(min = 54.dp)) {
+                    Text("랜드마크 이름 짓기")
+                }
+            }
+            else -> Text("지역을 완주했어요. 생성권은 공유 순위가 연결되면 확인할 수 있어요.")
+        }
+    }
+    if (creating) AlertDialog(onDismissRequest = { if (!saving) creating = false },
+        title = { Text("랜드마크 이름 짓기") }, text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("완주한 장소 중 한 곳을 고르세요.")
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    route.places.forEach { place ->
+                        FilterChip(point == place, { point = place }, { Text(place.name) }, modifier = Modifier.heightIn(min = 48.dp))
+                    }
+                }
+                OutlinedTextField(name, { if (it.length <= 24) { name = it; failed = false } }, label = { Text("이름 · 2~24자") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                if (failed) Text("이름이나 저장 상태를 확인해 주세요.", color = MaterialTheme.colorScheme.error)
+            }
+        }, confirmButton = {
+            Button({
+                val pointId = point.id
+                val title = name
+                saving = true
+                viewModel.journeyAction {
+                    try {
+                        if (createLandmark(pointId, title)) creating = false else failed = true
+                    } finally { saving = false }
+                }
+            }, enabled = !saving && name.trim().length in 2..24) { Text("등록하기") }
+        }, dismissButton = { TextButton({ creating = false }, enabled = !saving) { Text("취소") } })
+}

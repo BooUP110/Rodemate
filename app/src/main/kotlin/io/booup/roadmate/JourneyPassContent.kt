@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.booup.roadmate.model.RegionId
+import io.booup.roadmate.model.RewardClaimState
 import io.booup.roadmate.model.SeasonView
 
 private enum class PassPage(val label: String) {
@@ -35,13 +36,15 @@ private enum class PassPage(val label: String) {
 
 @Composable
 internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame, parkedStatus: String,
-    modifier: Modifier = Modifier, openAlbum: () -> Unit, openMemory: () -> Unit, openHome: () -> Unit,
-    tryOnHome: (CompanionPreview) -> Unit, priorityCare: @Composable () -> Unit) {
+    modifier: Modifier = Modifier, insets: PaddingValues = PaddingValues(0.dp),
+    openAlbum: () -> Unit, openMemory: () -> Unit, openHome: () -> Unit,
+    openStory: (() -> Unit)? = null, tryOnHome: (CompanionPreview) -> Unit, priorityCare: @Composable () -> Unit) {
     val progress by viewModel.progressUiState.collectAsStateWithLifecycle()
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
     val data by game.state.collectAsStateWithLifecycle()
     val season = progress.active?.takeIf { it.season.seasonId == JOURNEY_SEASON_ID }
     val archive = progress.archived.firstOrNull { it.season.seasonId == JOURNEY_SEASON_ID }
+    val summary = season ?: archive
     val owned = remember(trip.storage.postcards) { game.ownedCards() }
     val stamps = remember(data, trip.storage.postDrive, owned) { game.stamps(data, owned) }
     var pass by remember { mutableStateOf(JourneyPass.TRAVEL) }
@@ -50,12 +53,17 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
     var opened by remember { mutableStateOf(false) }
     var drawing by remember { mutableStateOf(false) }
     var drawFailed by remember { mutableStateOf(false) }
+    var rewardTier by remember { mutableStateOf<Int?>(null) }
     val world = when (page) {
         PassPage.LOBBY, PassPage.LIBRARY -> JourneyWorld.POST
         PassPage.DRAW -> drawResult?.takeIf { opened }?.world ?: JourneyWorld.POST
         else -> pass.world
     }
-    fun show(target: PassPage, themedPass: JourneyPass = pass) { pass = themedPass; page = target }
+    fun show(target: PassPage, themedPass: JourneyPass = pass) {
+        rewardTier = null
+        pass = themedPass
+        page = target
+    }
     fun goBack() {
         if (page == PassPage.LOBBY) openHome()
         else if (page == PassPage.TRIAL) show(PassPage.DETAIL)
@@ -69,27 +77,34 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
             .0f to world.deep.copy(alpha = .93f), .20f to world.deep.copy(alpha = .48f),
             .45f to Color.Transparent, .74f to world.deep.copy(alpha = .09f), 1f to world.deep.copy(alpha = .68f),
         )))
-        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 16.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = ::goBack, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(if (page == PassPage.LOBBY) "‹  동행" else "‹  뒤로", color = Color.White,
-                        fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        style = RoadmateType.control)
                 }
                 Spacer(Modifier.weight(1f))
-                Text(parkedStatus, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                    modifier = Modifier.background(world.deep.copy(alpha = .72f), RoundedCornerShape(24.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp))
+                if (progress.contentAllowed && summary != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        GamePill("${summary.progress.totalXp} XP")
+                        GameButton("패스권 ${game.tickets(data, owned)}", { show(PassPage.DRAW) })
+                    }
+                }
             }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically) {
                 listOf(PassPage.LOBBY, PassPage.STAMPS, PassPage.DRAW, PassPage.LIBRARY).forEach { target ->
                     TextButton(onClick = { show(target) }, modifier = Modifier.heightIn(min = 48.dp),
                         colors = ButtonDefaults.textButtonColors(
                             containerColor = if (page == target) world.paper else world.deep.copy(alpha = .60f),
                             contentColor = if (page == target) world.deep else Color.White),
                         contentPadding = PaddingValues(horizontal = 11.dp)) {
-                        Text(target.label, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(target.label, style = RoadmateType.control.copy(fontSize = 15.sp, lineHeight = 20.sp))
                     }
                 }
+                Text(parkedStatus, color = Color.White, style = RoadmateType.caption,
+                    modifier = Modifier.background(world.deep.copy(alpha = .72f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp))
             }
             priorityCare()
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
@@ -100,17 +115,16 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
                         .padding(top = 12.dp, bottom = 15.dp),
                         verticalArrangement = if (page in setOf(PassPage.DETAIL, PassPage.DRAW, PassPage.TRIAL))
                             Arrangement.SpaceBetween else Arrangement.spacedBy(14.dp)) {
-                        val summary = season ?: archive
                         if (!progress.contentAllowed) {
                             WorldTitle("시즌 기록을 불러오는 중", Color.White)
                         } else if (summary == null) {
-                            WorldPaper(world, Modifier.fillMaxWidth()) {
-                                SeasonContent(viewModel, viewModel.companionPreviews.firstOrNull())
-                            }
+                            WorldTitle("현재 진행 중인 시즌이 없어요.", Color.White)
                         } else when (page) {
                             PassPage.LOBBY -> SeasonGallery(summary, data, wide) { show(PassPage.DETAIL, it) }
                             PassPage.DETAIL -> PassJourney(viewModel, game, data, pass, summary, owned, wide,
-                                openAlbum, { show(PassPage.DRAW) }, { show(PassPage.TRIAL) }, { show(PassPage.LIBRARY) }, openHome)
+                                openAlbum, { show(PassPage.DRAW) }, { show(PassPage.TRIAL) }, { show(PassPage.LIBRARY) }, openHome,
+                                openStory.takeIf { pass == JourneyPass.TRAVEL && !summary.archived },
+                                rewardTier, { rewardTier = it })
                             PassPage.TRIAL -> CompanionTrial(pass, viewModel, wide, tryOnHome) { show(PassPage.DETAIL) }
                             PassPage.STAMPS -> {
                                 val canChoose = game.canChoose(data, stamps) && season != null
@@ -153,66 +167,102 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
                     }
                 }
             }
+            if (progress.contentAllowed && summary != null && (page == PassPage.LOBBY || page == PassPage.DETAIL)) {
+                val featured = if (page == PassPage.LOBBY) JourneyPass.TRAVEL else pass
+                JourneyTrack(summary, data, featured) { tier ->
+                    if (page == PassPage.LOBBY) show(PassPage.DETAIL, featured)
+                    rewardTier = tier
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun SeasonGallery(season: SeasonView, data: JourneyGameState, wide: Boolean, choose: (JourneyPass) -> Unit) {
-    WorldEyebrow("ROAD MATE  ·  SEASON 01  ·  내부 시연", JourneyWorld.POST.gold)
-    WorldTitle("세 가지 여행의 세계", Color.White)
-    Text("공유 ${season.progress.totalXp} XP  ·  Lv.${season.progress.currentLevel}", color = Color.White, fontSize = 16.sp)
+    WorldTitle("시즌 패스", Color.White)
+    Text("Lv.${season.progress.currentLevel} · ${data.grants.size}개 패스 보유", color = Color.White, style = RoadmateType.metric)
     val poster: @Composable (JourneyPass, Modifier) -> Unit = { pass, modifier ->
         val world = pass.world
         val shape = RoundedCornerShape(22.dp)
-        Box(modifier.height(if (wide) 270.dp else 212.dp).clip(shape).border(1.dp, world.gold, shape)
+        Box(modifier.height(if (wide) 216.dp else 185.dp).clip(shape).border(1.dp, world.gold, shape)
             .clickable(role = Role.Button, onClickLabel = "${pass.title} 패스 보기") { choose(pass) }) {
             WorldBackdrop(world, Modifier.matchParentSize())
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(.28f to Color.Transparent,
                 1f to world.deep.copy(alpha = .96f))))
             Column(Modifier.align(Alignment.BottomStart).padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                WorldEyebrow(if (data.grants.any { it.pass == pass }) "PREMIUM  ·  보유" else "SEASON PASS", world.gold)
-                Text(pass.title, color = Color.White, fontSize = 22.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold)
-                Text("패스 보기  ›", color = world.gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                if (data.grants.any { it.pass == pass }) WorldEyebrow("프리미엄 보유", world.gold)
+                Text(pass.title, color = Color.White, style = RoadmateType.cardTitle)
+                Text("패스 보기  ›", color = world.gold, style = RoadmateType.control)
             }
         }
     }
     if (wide) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        JourneyPass.entries.forEach { poster(it, Modifier.weight(1f)) }
+        JourneyPass.entries.forEach { poster(it, Modifier.weight(if (it == JourneyPass.TRAVEL) 1.5f else 1f)) }
     } else JourneyPass.entries.forEach { poster(it, Modifier.fillMaxWidth()) }
+}
+
+private fun journeyRewardTitle(pass: JourneyPass, tier: Int, premium: Boolean) = if (premium) {
+    if (tier == 3) "완주 동반자 팩" else pass.rewards[tier]
+} else when (tier) {
+    1 -> pass.rewards.first()
+    2 -> "${pass.theme} 배지"
+    else -> "완주 기념 소인"
+}
+
+@Composable
+private fun JourneyTrack(season: SeasonView, data: JourneyGameState, pass: JourneyPass, select: (Int) -> Unit) {
+    val entitled = data.grants.any { it.pass == pass }
+    val levels = season.season.levels.indices.map { index ->
+        val number = index + 1
+        val tier = (1..3).firstOrNull { rewardLevel(it) == number }
+        fun slot(premium: Boolean): List<PassRailReward> {
+            if (tier == null) return emptyList()
+            val state = when {
+                rewardKey(pass, tier, premium) in data.claimed -> RewardClaimState.CLAIMED
+                season.archived -> RewardClaimState.UNCLAIMED_EXPIRED
+                season.progress.currentLevel >= number && (!premium || entitled) -> RewardClaimState.AVAILABLE
+                else -> RewardClaimState.LOCKED
+            }
+            return listOf(PassRailReward(journeyRewardTitle(pass, tier, premium),
+                if (premium) "✦" else "✉", state) { select(tier) })
+        }
+        PassRailLevel(number, slot(false), slot(true))
+    }
+    GamePassRail(season, levels)
 }
 
 @Composable
 private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyGame, data: JourneyGameState, pass: JourneyPass,
     season: SeasonView, owned: Set<RegionId>, wide: Boolean, openAlbum: () -> Unit, openDraw: () -> Unit,
-    openTrial: () -> Unit, openLibrary: () -> Unit, openHome: () -> Unit) {
+    openTrial: () -> Unit, openLibrary: () -> Unit, openHome: () -> Unit, openStory: (() -> Unit)?,
+    rewardTier: Int?, selectReward: (Int?) -> Unit) {
     val world = pass.world
     val premium = data.grants.any { it.pass == pass }
-    var rewardTier by remember { mutableStateOf<Int?>(null) }
     var finalPack by remember { mutableStateOf(false) }
     val level = season.progress.currentLevel
     val levels = season.season.levels
-    val fraction = (season.progress.totalXp.toFloat() / levels.last().coerceAtLeast(1)).coerceIn(0f, 1f)
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         WorldEyebrow("${pass.theme}   ·   ${if (season.archived) "지난 시즌" else if (premium) "프리미엄 이용 중" else "무료 트랙"}", world.gold)
         WorldTitle(pass.title, Color.White, Modifier.widthIn(max = 700.dp))
     }
-    Spacer(Modifier.height(if (wide) 88.dp else 150.dp))
+    Spacer(Modifier.height(if (wide) 28.dp else 44.dp))
+    val regions = journeyRegionIds(owned)
     val collected = when (pass) {
-        JourneyPass.TRAVEL -> journeyPlaces.count { it.id in owned }
-        JourneyPass.STARS -> journeyPlaces.count { it.id in owned && it.id.value in data.starredCards }
-        JourneyPass.COAST -> coastalPlaces.count { it.id in owned }
+        JourneyPass.TRAVEL -> regions.size
+        JourneyPass.STARS -> journeyRegionIds(owned.filter { it.value in data.starredCards }.toSet()).size
+        JourneyPass.COAST -> coastalPlaces.count { it.id in regions }
     }
     val total = if (pass == JourneyPass.COAST) coastalPlaces.size else journeyPlaces.size
     WorldPaper(world, Modifier.align(if (wide) Alignment.Start else Alignment.CenterHorizontally).widthIn(max = 612.dp).fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             WorldEyebrow("✦  여행의 발자취", world.accent)
-            Text("Lv.$level / ${levels.size}", color = world.deep, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Lv.$level / ${levels.size}", color = world.deep, style = RoadmateType.metric)
         }
         Text("${season.progress.totalXp} XP  ·  ${season.nextLevelXp?.let { "다음 레벨까지 $it XP" } ?: "시즌 완주"}",
             color = world.deep, fontSize = 14.sp, lineHeight = 18.sp)
-        WorldRail(world, level, fraction) { rewardTier = it }
         Text("${pass.subtitle}  $collected/$total", color = world.deep, fontSize = 13.sp, lineHeight = 18.sp)
+        if (openStory != null) WorldAction("강릉 패스 이야기 시작", world, openStory)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             WorldAction("엽서 도감", world, openAlbum, primary = false)
             WorldAction("동반자 체험", world, openTrial, primary = false)
@@ -221,16 +271,14 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
     }
 
     rewardTier?.let { tier ->
-        AlertDialog(onDismissRequest = { rewardTier = null }, containerColor = world.paper,
+        AlertDialog(onDismissRequest = { selectReward(null) }, containerColor = world.paper,
             title = { WorldTitle("Lv.${rewardLevel(tier)} 여행 보상", world.deep) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf(false, true).forEach { isPremium ->
                         val claimed = rewardKey(pass, tier, isPremium) in data.claimed
                         val pack = isPremium && tier == 3
-                        val label = if (isPremium) {
-                            if (pack) "완주 동반자 팩" else pass.rewards[tier]
-                        } else listOf(pass.rewards.first(), "${pass.theme} 배지", "완주 기념 소인")[tier - 1]
+                        val label = journeyRewardTitle(pass, tier, isPremium)
                         val eligible = !season.archived && level >= rewardLevel(tier) && (!isPremium || premium) && !claimed
                         if (isPremium) HorizontalDivider(color = world.accent.copy(alpha = .24f))
                         WorldEyebrow(if (isPremium) "프리미엄 트랙" else "무료 트랙", world.accent)
@@ -243,12 +291,12 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
                             else -> "레벨 ${rewardLevel(tier)}에서 해금"
                         }, color = world.deep, fontSize = 14.sp)
                         if (eligible || (pack && claimed)) WorldAction(if (pack) "동반자 팩 열기" else "보상 받기", world, {
-                            if (pack) { rewardTier = null; finalPack = true }
+                            if (pack) { selectReward(null); finalPack = true }
                             else viewModel.journeyAction { game.claim(pass, tier, isPremium) }
                         })
                     }
                 }
-            }, confirmButton = { WorldAction("닫기", world, { rewardTier = null }, primary = false) })
+            }, confirmButton = { WorldAction("닫기", world, { selectReward(null) }, primary = false) })
     }
     if (finalPack) {
         val claimed = rewardKey(pass, 3, true) in data.claimed
@@ -278,7 +326,7 @@ private fun ColumnScope.TravelPost(world: JourneyWorld, tickets: Int, candidates
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         WorldEyebrow("TRAVEL POST  ·  패스권 뽑기", world.gold)
         WorldTitle(if (revealed) "여행 패스권 도착!" else "여행 우체국", Color.White)
-        Text("무료 뽑기권 ${tickets}장  ·  미보유 패스 ${candidates.size}종", color = Color.White, fontSize = 15.sp)
+        Text("무료 뽑기권 ${tickets}장  ·  미보유 패스 ${candidates.size}종", color = Color.White, style = RoadmateType.metric)
     }
     val scale by animateFloatAsState(if (revealed) .78f else if (result != null) 1.06f else .91f,
         spring(dampingRatio = .58f), label = "travel envelope")
@@ -416,7 +464,7 @@ private fun PassLibrary(viewModel: RoadmateViewModel, data: JourneyGameState, ar
                 WorldAction(if (data.equipped == id) "동행 홈에서 보기" else "로드메이트로 지정", world,
                     { viewModel.equipJourneyCompanion(id, openHome) }, primary = false)
                 viewModel.journeyGame?.visibleMemories(data)?.firstOrNull { it.companion == id }?.let { memory ->
-                    val place = journeyPlaces.firstOrNull { it.name == memory.region }
+                    val place = Expedition.entries.flatMap { listOf(it.region) + it.places }.firstOrNull { it.name == memory.region }
                     PostcardArtwork(place, art, mascot, Modifier.fillMaxWidth().height(128.dp), animate = true)
                     Text("${memory.region}에서의 첫 동행", color = world.deep)
                     Text(journeyMemoryLine(id.value, memory.region), color = world.deep)

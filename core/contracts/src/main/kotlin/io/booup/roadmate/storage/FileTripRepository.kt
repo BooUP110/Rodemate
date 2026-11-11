@@ -29,6 +29,7 @@ internal fun verifyStore(condition: Boolean, error: StorageError = StorageError.
 class FileTripRepository(private val directory: File, private val mode: RuntimeMode,
     private val collectionRetention: CollectionRetentionPolicy = CollectionRetentionPolicy.KEEP_WITHOUT_SOURCE_TRIP,
     private val encryption: StorageEncryption,
+    private val progressEngine: SafeProgressEngine = SafeProgressEngine(),
     private val beforeAtomicReplace: () -> Unit = {}) : TripRepository, CollectionRepository, SeasonRepository, ComfortPreferenceRepository {
     private val mutableState = MutableStateFlow(TripStorageState())
     override val state = mutableState.asStateFlow()
@@ -149,7 +150,7 @@ class FileTripRepository(private val directory: File, private val mode: RuntimeM
         var data=current.progression
         val season=data.seasons.singleOrNull { now.epochMillis in it.startsAtEpochMillis until it.endsAtEpochMillis }
         if(season!=null) ProgressEventFactory().events(current).forEach { event ->
-            SafeProgressEngine().award(data,season,event,now,mode)?.let { data=data.copy(ledger=data.ledger+it) }
+            progressEngine.award(data,season,event,now,mode)?.let { data=data.copy(ledger=data.ledger+it) }
         }
         current.copy(progression=data)
     }

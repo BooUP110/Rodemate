@@ -1,9 +1,12 @@
 package io.booup.roadmate.model
 
+const val EXPEDITION_POINT_PREFIX = "expedition:"
+const val EXPEDITION_FIRST_VISIT_XP = 20L
+
 enum class ProgressEventType { TRIP_COMPLETED, FIRST_REGION_VISIT, POSTCARD_ACQUIRED, REFLECTION_COMPLETED,
     POST_DRIVE_SESSION_COMPLETED, LOW_BEAM_OFF_WARNING, IMMEDIATE_VEHICLE_WARNING, REST_RECOMMENDATION, HVAC_SUGGESTION }
 data class ProgressEvent(val eventId:String, val type:ProgressEventType, val sourceId:String, val tripId:String,
-    val occurredAtEpochMillis:Long, val source:DataSource, val quality:TripDataQuality)
+    val occurredAtEpochMillis:Long, val source:DataSource, val quality:TripDataQuality, val distanceMeters:Long?=null)
 enum class XpReason { AWARDED, DAILY_CAP, TRIP_CAP, NON_XP_EVENT }
 data class XpLedgerEntry(val ledgerId:String, val seasonId:String, val progressEventId:String,
     val sourceType:ProgressEventType, val sourceId:String?, val sourceTripId:String?, val sourceDeleted:Boolean,

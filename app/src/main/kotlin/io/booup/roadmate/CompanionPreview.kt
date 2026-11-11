@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import io.booup.roadmate.model.CompanionProfile
+import io.booup.roadmate.model.CompanionProfiles
 import io.booup.roadmate.model.CompanionTone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -65,9 +66,25 @@ internal fun artwork(path: String?): ImageBitmap? {
 @Composable
 fun CompanionPreviewPortrait(preview: CompanionPreview, modifier: Modifier = Modifier, animate: Boolean = true,
     roam: Boolean = false) = key(preview.profile.id) {
-    val atlas = artwork(if (animate || preview.portrait == preview.idleAtlas) preview.idleAtlas else null)
-    val still = artwork(if (atlas == null) preview.portrait else null)
-    val description = "${preview.profile.displayName} · 콜라보 초상화"
+    CompanionArtwork(preview.portrait, preview.idleAtlas, "${preview.profile.displayName} · 콜라보 초상화", modifier, animate, roam) {
+        val original = if (preview.profile.tone == CompanionTone.WARM) CompanionProfiles.somsom else CompanionProfiles.dodam
+        OriginalCompanionPortrait(original, modifier, animate, roam)
+    }
+}
+
+@Composable
+internal fun OriginalCompanionPortrait(profile: CompanionProfile, modifier: Modifier = Modifier, animate: Boolean = true,
+    roam: Boolean = false) = key(profile.id) {
+    val atlas = if (profile.id == CompanionProfiles.somsom.id) "starlight-somsom-idle.png" else "wave-otter-idle.png"
+    val path = "original-companions/$atlas"
+    CompanionArtwork(path, path, profile.displayName, modifier, animate, roam)
+}
+
+@Composable
+private fun CompanionArtwork(portrait: String, idleAtlas: String?, description: String, modifier: Modifier,
+    animate: Boolean, roam: Boolean, fallback: @Composable () -> Unit = {}) {
+    val atlas = artwork(if (animate || portrait == idleAtlas) idleAtlas else null)
+    val still = artwork(portrait.takeIf { portrait != idleAtlas && atlas == null })
     if (atlas != null && animate && roam) {
         RoamingCompanionPortrait(atlas, description, modifier)
     } else if (atlas != null) {
@@ -82,7 +99,7 @@ fun CompanionPreviewPortrait(preview: CompanionPreview, modifier: Modifier = Mod
         }
         AtlasFrame(atlas, frame, modifier.semantics { contentDescription = description })
     } else if (still != null) Image(still, contentDescription = description, modifier = modifier)
-    else CompanionPortrait(preview.profile.displayName, preview.profile.tone == CompanionTone.WARM, modifier)
+    else fallback()
 }
 
 @Composable

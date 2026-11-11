@@ -3,6 +3,7 @@ package io.booup.roadmate
 import android.content.Context
 import io.booup.roadmate.model.CompanionId
 import io.booup.roadmate.model.ContextClock
+import io.booup.roadmate.model.RegionId
 import io.booup.roadmate.model.RuntimeMode
 import io.booup.roadmate.postdrive.PostDriveCoordinator
 import io.booup.roadmate.progress.ProgressCoordinator
@@ -56,6 +57,12 @@ internal fun encodeJourneyGame(state: JourneyGameState) = JSONObject().apply {
     put("equipped", state.equipped?.value ?: JSONObject.NULL)
     put("equippedAt", state.equippedAt)
     put("progressResetAt", state.progressResetAt)
+    put("moonlightCompleted", state.moonlightCompleted)
+    put("moonlightOutfit", state.moonlightOutfit ?: JSONObject.NULL)
+    put("landmarks", JSONArray(state.landmarks.map {
+        JSONObject().put("pointId", it.pointId.value).put("name", it.name)
+            .put("visitors", JSONArray(it.visitors.toList())).put("likes", JSONArray(it.likes.toList()))
+    }))
     put("memories", JSONArray(state.memories.map {
         JSONObject().put("tripId", it.tripId).put("region", it.region).put("companion", it.companion.value)
     }))
@@ -66,11 +73,12 @@ internal fun decodeJourneyGame(encoded: String): JourneyGameState {
     fun <T> entries(key: String, read: (JSONArray, Int) -> T): List<T> = data.optJSONArray(key)?.let { values ->
         List(values.length()) { read(values, it) }
     }.orEmpty()
+    val claims = entries("claimed", JSONArray::getString).toSet()
     return JourneyGameState(
         grants = entries("passes") { values, index -> values.getJSONObject(index).let {
             PassGrant(JourneyPass.valueOf(it.getString("pass")), it.getBoolean("drawn"))
         } }.distinctBy { it.pass },
-        claimed = entries("claimed", JSONArray::getString).toSet(),
+        claimed = claims,
         openedCards = entries("opened", JSONArray::getString).toSet(),
         starredCards = entries("starred", JSONArray::getString).toSet(),
         checkedCare = data.optBoolean("checkedCare"),
@@ -78,6 +86,18 @@ internal fun decodeJourneyGame(encoded: String): JourneyGameState {
         equipped = if (data.isNull("equipped")) null else CompanionId(data.getString("equipped")),
         equippedAt = data.optLong("equippedAt"),
         progressResetAt = data.optLong("progressResetAt", -1),
+        moonlightCompleted = data.optInt("moonlightCompleted").coerceIn(0, MoonlightChapter.entries.size),
+        moonlightOutfit = MoonlightOutfit.entries.firstOrNull {
+            it.name == data.optString("moonlightOutfit") && it.claimKey in claims
+        }?.name,
+        landmarks = entries("landmarks") { values, index -> values.getJSONObject(index).let { entry ->
+            fun people(key: String) = entry.getJSONArray(key).let { ids ->
+                (0 until ids.length()).map { ids.getInt(it) }.filter { it in 1..3 }.toSet()
+            }
+            val visitors = people("visitors")
+            ExpeditionLandmark(RegionId(entry.getString("pointId")), entry.getString("name"), visitors,
+                people("likes").intersect(visitors))
+        } },
         memories = entries("memories") { values, index -> values.getJSONObject(index).let {
             JourneyMemory(it.getString("tripId"), it.getString("region"), CompanionId(it.getString("companion")))
         } },

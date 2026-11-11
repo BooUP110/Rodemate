@@ -8,13 +8,14 @@ import java.time.ZoneId
 fun progressKey(value:String):String = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
     .joinToString("") { "%02x".format(it.toInt() and 255) }
 
-/** Only already committed facts are inputs. No VehicleContext, care payload, distance or driving-duration reward input. */
+/** Builds events from committed trip and collection records. */
 class ProgressEventFactory {
     fun events(state:TripStorageState):List<ProgressEvent> = state.trips.flatMap { trip ->
         if(trip.state!=TripState.COMPLETED || trip.endedAtEpochMillis==null || trip.confirmedDrivingMillis<=0 ||
             trip.quality !in setOf(TripDataQuality.COMPLETE,TripDataQuality.PARTIAL)) return@flatMap emptyList()
         fun event(type:ProgressEventType,sourceId:String)=ProgressEvent(progressKey("${type.name}:$sourceId"),type,sourceId,
-            trip.tripId,requireNotNull(trip.endedAtEpochMillis),trip.source,trip.quality)
+            trip.tripId,requireNotNull(trip.endedAtEpochMillis),trip.source,trip.quality,
+            trip.distanceMeters.takeIf { type == ProgressEventType.TRIP_COMPLETED })
         buildList {
             add(event(ProgressEventType.TRIP_COMPLETED,trip.tripId))
             if(state.visits.any { it.sourceTripId==trip.tripId && !it.sourceTripDeleted })
@@ -34,7 +35,21 @@ object ProgressEligibilityPolicy {
         (if(mode==RuntimeMode.DEMO) event.source==DataSource.SIMULATED else event.source !in setOf(DataSource.SIMULATED,DataSource.UNKNOWN))
 }
 
-class SafeProgressEngine : io.booup.roadmate.contracts.SeasonPassEngine {
+class SafeProgressEngine(private val explorationRewards: Boolean = false) : io.booup.roadmate.contracts.SeasonPassEngine {
+    internal fun waypointBonus(type: ProgressEventType, sourceId: String?, sourceDeleted: Boolean = false) =
+        explorationRewards && type == ProgressEventType.FIRST_REGION_VISIT &&
+            (sourceDeleted || sourceId?.startsWith(EXPEDITION_POINT_PREFIX) == true)
+
+    internal fun maximumAward(config: ProgressConfig, type: ProgressEventType, sourceId: String?,
+        distanceMeters: Long?, sourceDeleted: Boolean = false): Long = when (type) {
+        ProgressEventType.TRIP_COMPLETED -> config.tripXp + if (explorationRewards)
+            ((distanceMeters ?: if (sourceDeleted) 5_000L else 0L) / 1_000L).coerceIn(0L, 5L) else 0L
+        ProgressEventType.FIRST_REGION_VISIT -> if (waypointBonus(type, sourceId, sourceDeleted)) EXPEDITION_FIRST_VISIT_XP else 0L
+        ProgressEventType.POSTCARD_ACQUIRED -> config.postcardXp
+        ProgressEventType.POST_DRIVE_SESSION_COMPLETED -> config.postDriveXp
+        else -> 0L
+    }
+
     fun validate(season:Season) {
         require(season.seasonId.isNotBlank() && season.title.isNotBlank() && season.startsAtEpochMillis>=0 && season.endsAtEpochMillis>season.startsAtEpochMillis)
         require(season.levels.isNotEmpty() && season.levels.first()==0L && season.levels.zipWithNext().all { it.first<it.second })
@@ -53,14 +68,14 @@ class SafeProgressEngine : io.booup.roadmate.contracts.SeasonPassEngine {
             data.ledger.any { it.progressEventId==event.eventId } || now.epochMillis < (data.ledger.maxOfOrNull { it.awardedAtEpochMillis }?:0)) return null
         val day=Instant.ofEpochMilli(now.epochMillis).atZone(ZoneId.of(season.config.zoneId)).toLocalDate().toString()
         val tripKey=progressKey(event.tripId)
-        val requested=when(event.type) { ProgressEventType.TRIP_COMPLETED -> season.config.tripXp
-            ProgressEventType.POSTCARD_ACQUIRED -> season.config.postcardXp
-            ProgressEventType.POST_DRIVE_SESSION_COMPLETED -> season.config.postDriveXp; else -> 0 }
-        // Global daily/trip sums include other seasons, preventing a same-day season transition from resetting the cap.
-        val daily=data.ledger.filter { it.dayKey==day }.sumOf { it.awardedXp }
-        val trip=data.ledger.filter { it.tripKey==tripKey }.sumOf { it.awardedXp }
+        val waypointBonus = waypointBonus(event.type, event.sourceId)
+        val requested = maximumAward(season.config, event.type, event.sourceId, event.distanceMeters)
+        // A waypoint bonus is limited by the catalog and event ID. Recurring rewards retain the shared caps.
+        val capped = data.ledger.filterNot { waypointBonus(it.sourceType, it.sourceId, it.sourceDeleted) }
+        val daily=capped.filter { it.dayKey==day }.sumOf { it.awardedXp }
+        val trip=capped.filter { it.tripKey==tripKey }.sumOf { it.awardedXp }
         val dailyRoom=(season.config.dailyCap-daily).coerceAtLeast(0); val tripRoom=(season.config.tripCap-trip).coerceAtLeast(0)
-        val xp=minOf(requested,dailyRoom,tripRoom)
+        val xp=if (waypointBonus) requested else minOf(requested,dailyRoom,tripRoom)
         val reason=when { requested==0L -> XpReason.NON_XP_EVENT; xp<requested && dailyRoom<=tripRoom -> XpReason.DAILY_CAP
             xp<requested -> XpReason.TRIP_CAP; else -> XpReason.AWARDED }
         return XpLedgerEntry(event.eventId,season.seasonId,event.eventId,event.type,event.sourceId,event.tripId,false,tripKey,xp,now.epochMillis,day,reason,event.source)

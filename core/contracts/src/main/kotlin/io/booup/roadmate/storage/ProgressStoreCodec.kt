@@ -20,6 +20,8 @@ internal class ProgressStoreCodec(private val mode:RuntimeMode) {
         verifyStore(d.premiumSeasons.all { id -> d.seasons.any { it.seasonId==id } })
         verifyStore(d.ledger.map { it.progressEventId }.distinct().size==d.ledger.size && d.ledger.map { it.ledgerId }.distinct().size==d.ledger.size)
         val hash=Regex("[0-9a-f]{64}")
+        val awards = SafeProgressEngine(explorationRewards = true)
+        val trips = state.trips.associateBy { it.tripId }
         val daily=mutableMapOf<String,Long>(); val perTrip=mutableMapOf<String,Long>()
         var previous=0L
         d.ledger.forEach { l ->
@@ -29,16 +31,22 @@ internal class ProgressStoreCodec(private val mode:RuntimeMode) {
                 l.awardedAtEpochMillis in s.startsAtEpochMillis until s.endsAtEpochMillis)
             previous=l.awardedAtEpochMillis
             verifyStore(if(mode==RuntimeMode.DEMO) l.source==DataSource.SIMULATED else l.source !in setOf(DataSource.SIMULATED,DataSource.UNKNOWN),StorageError.WRONG_ENVIRONMENT)
-            verifyStore(if(l.sourceDeleted) l.sourceId==null && l.sourceTripId==null else l.sourceId!=null && state.trips.any { it.tripId==l.sourceTripId } &&
+            val trip = l.sourceTripId?.let(trips::get)
+            verifyStore(if(l.sourceDeleted) l.sourceId==null && l.sourceTripId==null else l.sourceId!=null && trip != null &&
                 progressKey(requireNotNull(l.sourceTripId))==l.tripKey && progressKey("${l.sourceType.name}:${l.sourceId}")==l.progressEventId)
             val day=Instant.ofEpochMilli(l.awardedAtEpochMillis).atZone(ZoneId.of(s.config.zoneId)).toLocalDate().toString()
             verifyStore(l.dayKey==day)
-            val maximum=when(l.sourceType) { ProgressEventType.TRIP_COMPLETED -> s.config.tripXp; ProgressEventType.POSTCARD_ACQUIRED -> s.config.postcardXp
-                ProgressEventType.POST_DRIVE_SESSION_COMPLETED -> s.config.postDriveXp; else -> 0 }
+            val maximum = awards.maximumAward(s.config, l.sourceType, l.sourceId, trip?.distanceMeters, l.sourceDeleted)
             verifyStore(l.awardedXp<=maximum && (maximum!=0L || l.reason==XpReason.NON_XP_EVENT))
-            verifyStore(l.awardedXp<=(s.config.dailyCap-(daily[day]?:0)).coerceAtLeast(0) &&
-                l.awardedXp<=(s.config.tripCap-(perTrip[l.tripKey]?:0)).coerceAtLeast(0))
-            daily[day]=(daily[day]?:0)+l.awardedXp; perTrip[l.tripKey]=(perTrip[l.tripKey]?:0)+l.awardedXp
+            if (awards.waypointBonus(l.sourceType, l.sourceId, l.sourceDeleted)) {
+                if (!l.sourceDeleted && l.awardedXp > 0L) verifyStore(state.visits.any { visit ->
+                    visit.regionId.value == l.sourceId && visit.sourceTripId == l.sourceTripId && !visit.sourceTripDeleted
+                })
+            } else {
+                verifyStore(l.awardedXp<=(s.config.dailyCap-(daily[day]?:0)).coerceAtLeast(0) &&
+                    l.awardedXp<=(s.config.tripCap-(perTrip[l.tripKey]?:0)).coerceAtLeast(0))
+                daily[day]=(daily[day]?:0)+l.awardedXp; perTrip[l.tripKey]=(perTrip[l.tripKey]?:0)+l.awardedXp
+            }
         }
         verifyStore(d.claims.map { it.seasonId to it.rewardId }.distinct().size==d.claims.size)
         d.claims.forEach { c ->

@@ -8,8 +8,8 @@ enum class CompanionExpression { NEUTRAL, HAPPY, CONCERNED, LISTENING, CONFIRMIN
 /** Visual identity and tone only. No rules, permissions, safety text or actions. */
 data class CompanionProfile(val id: CompanionId, val displayName: String, val initials: String, val tone: CompanionTone)
 object CompanionProfiles {
-    val dodam = CompanionProfile(CompanionId("original_dodam"), "도담 (가칭)", "도", CompanionTone.CALM)
-    val somsom = CompanionProfile(CompanionId("original_somsom"), "솜솜 (가칭)", "솜", CompanionTone.WARM)
+    val dodam = CompanionProfile(CompanionId("original_dodam"), "파도 수달", "수", CompanionTone.CALM)
+    val somsom = CompanionProfile(CompanionId("original_somsom"), "별빛 솜솜", "솜", CompanionTone.WARM)
     val all: List<CompanionProfile> = Collections.unmodifiableList(listOf(dodam, somsom))
     fun find(id: CompanionId): CompanionProfile = all.firstOrNull { it.id == id } ?: dodam
 }

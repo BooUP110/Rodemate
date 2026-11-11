@@ -41,9 +41,9 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
         return viewModel.companionPreviews.firstOrNull { it.profile.id == id }
     }
     LaunchedEffect(detail) { detail?.let { key -> game?.openCard(key.regionId) } }
-    val slots = (journeyPlaces.map { it to owned[it.id] } + state.collection.filter { card ->
-        journeyPlaces.none { it.id == card.key.regionId }
-    }.map { null to it }).filter { (_, card) ->
+    val collectedRegions = journeyRegionIds(owned.keys)
+    val slots = (journeyPlaces.filter { it.id !in collectedRegions }.map { it to null } +
+        state.collection.map { journeyPlace(it.key.regionId) to it }).filter { (_, card) ->
         when (filter) {
             AlbumFilter.ALL -> true
             AlbumFilter.OWNED -> card != null
@@ -51,20 +51,20 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
             AlbumFilter.SEASON -> card != null && (season == null || card.calendar.season == season)
         }
     }
-    RoadmateCard(tinted = true) {
-        Text("엽서 컬렉션", style = MaterialTheme.typography.headlineMedium)
-        Text("우리의 드라이브 앨범 · 보유 ${state.collection.size}장", style = MaterialTheme.typography.titleMedium)
-        val covered = journeyPlaces.count { it.id in owned }
+    RoadmateStoryHeader("엽서 컬렉션", "모은 엽서 ${state.collection.size}장", "drive-memory.png", 1)
+    RoadmateCard(tinted = true, compact = true) {
+        val covered = collectedRegions.size
         LinearProgressIndicator(progress = { covered / journeyPlaces.size.toFloat() }, modifier = Modifier.fillMaxWidth().height(8.dp))
         Text("여행 테마 엽서 $covered / ${journeyPlaces.size}장")
     }
     if (gameState != null) RoadmateCard {
-        val coast = coastalPlaces.count { it.id in owned }
-        val stars = journeyPlaces.count { it.id in owned && it.id.value in gameState.starredCards }
+        val coast = coastalPlaces.count { it.id in collectedRegions }
+        val starredRegions = journeyRegionIds(owned.keys.filter { it.value in gameState.starredCards }.toSet())
+        val stars = starredRegions.size
         Text("엽서 세트", style = MaterialTheme.typography.titleLarge)
         Text("바닷길 앨범 $coast / ${coastalPlaces.size} · 강릉과 제주")
         Text("별자리 페이지 $stars / ${journeyPlaces.size} · 엽서를 열어 별 붙이기")
-        if (stars > 0) Text(journeyPlaces.joinToString("    ") { if (it.id.value in gameState.starredCards) "★" else "☆" })
+        if (stars > 0) Text(journeyPlaces.joinToString("    ") { if (it.id in starredRegions) "★" else "☆" })
         if (coast == coastalPlaces.size) {
             if ("coast-set" in gameState.claimed) RoadmateBadge("바닷길 세트 · 등대 소인 획득")
             else OutlinedButton(onClick = { viewModel.journeyAction { claimSet() } }, modifier = Modifier.heightIn(min = 54.dp)) { Text("등대 소인 받기") }
@@ -115,7 +115,7 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
     }
     OutlinedButton(onClick = { openMap(null) }, modifier = Modifier.heightIn(min = 56.dp)) { Text("탐험 지도 열기") }
     owned.values.firstOrNull { it.key == detail }?.let { card ->
-        val place = journeyPlaces.firstOrNull { it.id == card.key.regionId }
+        val place = journeyPlace(card.key.regionId)
         val postcardCompanion = tripMascot(card)
         var back by remember(card.key) { mutableStateOf(true) }
         val turn by animateFloatAsState(if (back) 180f else 0f, tween(400), label = "postcard turn")
@@ -169,7 +169,6 @@ internal fun PostcardArtwork(place: JourneyPlace?, atlas: ImageBitmap?, preview:
     Box(modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFFDCEEE4))) {
         if (place != null && atlas != null) AtlasFrame(atlas, place.art, Modifier.matchParentSize(), fill = true)
         if (preview != null) CompanionPreviewPortrait(preview, Modifier.align(Alignment.BottomEnd).size(102.dp), animate)
-        else if (companion != null) CompanionPortrait(companion.displayName, companion.tone == CompanionTone.WARM,
-            Modifier.align(Alignment.BottomEnd).size(102.dp))
+        else if (companion != null) OriginalCompanionPortrait(companion, Modifier.align(Alignment.BottomEnd).size(102.dp), animate)
     }
 }

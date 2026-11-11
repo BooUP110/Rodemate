@@ -1,0 +1,106 @@
+package io.booup.roadmate
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import io.booup.roadmate.model.CompanionId
+import io.booup.roadmate.model.CompanionProfile
+
+@Composable
+internal fun RoadmateHomeStage(
+    insets: PaddingValues, profile: CompanionProfile, preview: CompanionPreview?, profiles: List<CompanionProfile>,
+    status: String, drivingState: String, postcards: Int, xp: Long?, openStory: (() -> Unit)?,
+    openMap: () -> Unit, selectCompanion: (CompanionId) -> Unit, endTrial: (() -> Unit)?,
+    navigation: @Composable () -> Unit, priorityCare: @Composable () -> Unit,
+    vehicleDetails: @Composable ColumnScope.() -> Unit,
+) {
+    var chooseCompanion by remember { mutableStateOf(false) }
+    var showVehicle by remember { mutableStateOf(false) }
+    val atlas = artwork("journey/postcards.png")
+    Box(Modifier.fillMaxSize().background(GameInk)) {
+        RoadmateLandscape("home-parked.png", 3, Modifier.matchParentSize(), atlas)
+        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(
+            0f to GameInk.copy(alpha = .82f), .43f to GameInk.copy(alpha = .22f), .75f to Color.Transparent)))
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(
+            0f to GameInk.copy(alpha = .55f), .25f to Color.Transparent, .72f to Color.Transparent,
+            1f to GameInk.copy(alpha = .91f))))
+
+        BoxWithConstraints(Modifier.fillMaxSize().padding(insets)) {
+            val wide = maxWidth >= 740.dp
+            val margin = if (wide) 30.dp else 14.dp
+            val actorSize = minOf(maxWidth * if (wide) .38f else .63f, maxHeight * if (wide) .64f else .34f)
+            val actor = Modifier.align(BiasAlignment(if (wide) .65f else .35f, if (wide) .34f else -.30f)).size(actorSize)
+            if (preview == null) OriginalCompanionPortrait(profile, actor, roam = true)
+            else CompanionPreviewPortrait(preview, actor, roam = true)
+
+            Column(Modifier.align(if (wide) BiasAlignment(-1f, .14f) else Alignment.BottomStart)
+                .padding(start = margin, end = margin, bottom = if (wide) 56.dp else 102.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("AI Roadmate", color = GamePaper, style = RoadmateType.heading.copy(
+                    fontSize = if (wide) 70.sp else 40.sp, lineHeight = if (wide) 78.sp else 48.sp,
+                    letterSpacing = (-1).sp))
+                Text(profile.displayName, color = GameGold,
+                    style = RoadmateType.cardTitle.copy(fontSize = if (wide) 28.sp else 22.sp, lineHeight = 34.sp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (openStory != null) GameButton("강릉 이야기", openStory, primary = true)
+                    GameButton("탐험 시작", openMap, primary = openStory == null)
+                }
+            }
+
+            Row(Modifier.align(if (wide) BiasAlignment(.92f, .66f) else BiasAlignment(1f, .02f))
+                .padding(horizontal = margin), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (endTrial != null) GameButton("체험 끝내기", endTrial)
+                GameButton("동행 바꾸기", { chooseCompanion = true })
+            }
+
+            Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = margin, vertical = 12.dp)) {
+                navigation()
+            }
+
+            Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = margin, vertical = 12.dp)
+                .zIndex(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    GamePill(status)
+                    if (wide) Spacer(Modifier.weight(1f))
+                    GamePill("엽서 $postcards")
+                    if (xp != null) GamePill("$xp XP")
+                    GameButton("차량 상태", { showVehicle = true })
+                }
+                priorityCare()
+            }
+        }
+    }
+
+    if (chooseCompanion) AlertDialog(onDismissRequest = { chooseCompanion = false }, containerColor = GameInk,
+        title = { Text("함께할 동행", color = GamePaper) }, text = {
+            Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                profiles.distinctBy { it.displayName }.forEach { option ->
+                    GameButton(option.displayName, {
+                        selectCompanion(option.id)
+                        chooseCompanion = false
+                    }, Modifier.fillMaxWidth(), primary = option.id == profile.id)
+                }
+            }
+        }, confirmButton = { GameButton("닫기", { chooseCompanion = false }) })
+
+    if (showVehicle) AlertDialog(onDismissRequest = { showVehicle = false },
+        title = { Text(drivingState, style = MaterialTheme.typography.titleMedium) }, text = {
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()), content = vehicleDetails)
+        }, confirmButton = { GameButton("닫기", { showVehicle = false }) })
+}

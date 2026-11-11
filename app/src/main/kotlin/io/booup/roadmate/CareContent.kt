@@ -1,6 +1,7 @@
 package io.booup.roadmate
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -43,7 +44,8 @@ private fun CareBanner(presentation: CarePresentation, respond: (CareResponse) -
 
 @Composable
 private fun CareSuggestionCard(presentation: CarePresentation, respond: (CareResponse) -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         CareCardBody(presentation, respond)
     }
 }

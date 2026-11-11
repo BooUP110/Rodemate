@@ -9,6 +9,78 @@ import org.junit.Test
 import kotlin.random.Random
 
 class JourneyGameTest {
+    @Test fun moonlightChaptersRequireOrderedDemoVisitsAndPremiumRewardsRequireEntitlement() = runBlocking {
+        val fixture = Fixture().apply { parked = true }
+        val game = fixture.create()
+        val first = MoonlightChapter.OJUKHEON
+        assertFalse(game.completeMoonlightChapter(first, first.answer))
+        fixture.trip = fixture.trip.copy(visits = MoonlightChapter.entries.map { chapter ->
+            RegionVisitRecord(chapter.place.id, chapter.ordinal.toLong(), null, true, RegionEvidenceSource.DEMO)
+        })
+        val second = MoonlightChapter.GYEONGPODAE
+        assertFalse(game.completeMoonlightChapter(second, second.answer))
+        assertFalse(game.completeMoonlightChapter(first, first.answer + 1))
+        assertFalse(game.claimMoonlightOutfit(MoonlightOutfit.SCARF))
+        assertTrue(game.completeMoonlightChapter(first, first.answer))
+        assertTrue(game.completeMoonlightChapter(first, first.answer))
+        assertEquals(1, fixture.create().state.value.moonlightCompleted)
+        assertTrue(game.claimMoonlightOutfit(MoonlightOutfit.SCARF))
+        assertTrue(game.equipMoonlightOutfit(MoonlightOutfit.SCARF))
+        assertFalse(game.equipMoonlightOutfit(MoonlightOutfit.HAT))
+        assertTrue(game.completeMoonlightChapter(second, second.answer))
+        assertFalse(game.claimMoonlightOutfit(MoonlightOutfit.HAT))
+        assertTrue(game.grantDemoMoonlightPremium())
+        assertTrue(game.claimMoonlightOutfit(MoonlightOutfit.HAT))
+        MoonlightChapter.entries.drop(2).forEach { assertTrue(game.completeMoonlightChapter(it, it.answer)) }
+        assertTrue(game.claimMoonlightOutfit(MoonlightOutfit.CAPE))
+        assertEquals(4, fixture.create().state.value.moonlightCompleted)
+        assertEquals(MoonlightOutfit.SCARF.name, fixture.create().state.value.moonlightOutfit)
+    }
+
+    @Test fun expeditionOnlyConnectsRevealedPoints() {
+        val route = Expedition.SEOUL
+        val (first, second, third, last) = route.places
+        assertEquals(listOf(first), route.revealed(emptySet()))
+        assertEquals(listOf(first, second, third), route.revealed(setOf(first.id, second.id)))
+        assertEquals(listOf(third, second, first), route.connection(third.id, first.id, setOf(first.id, second.id)))
+        assertTrue(route.connection(first.id, last.id, setOf(first.id)).isEmpty())
+        assertEquals(listOf(first, second, last), route.revealed(setOf(first.id, last.id)))
+        assertTrue(route.connection(first.id, last.id, setOf(first.id, last.id)).isEmpty())
+        assertNull(route.next(route.places.map { it.id }.toSet()))
+        assertEquals(setOf(route.region.id), journeyRegionIds(setOf(first.id, second.id, route.region.id)))
+        assertEquals(first, verifiedExpeditionPoint(TripLocation(first.name, DataSource.VEHICLE_SDK)))
+        assertNull(verifiedExpeditionPoint(TripLocation(first.name, DataSource.USER_INPUT)))
+        assertNull(verifiedExpeditionPoint(TripLocation(route.region.name, DataSource.SYSTEM)))
+    }
+
+    @Test fun landmarkRequiresRankedCompletionAndFeedbackCountsEachVisitorOnce() = runBlocking {
+        val fixture = Fixture().apply { parked = true }
+        val game = fixture.create()
+        val route = Expedition.GANGNEUNG
+        val point = route.places.first()
+        assertFalse(game.createLandmark(point.id, "파도의 정원"))
+        val completed = route.places.mapIndexed { index, place ->
+            RegionVisitRecord(place.id, 1_000L + 2_000 * index, null, true, RegionEvidenceSource.DEMO)
+        }
+        fixture.trip = fixture.trip.copy(visits = completed.map { it.copy(source = RegionEvidenceSource.VERIFIED_CONTEXT) })
+        assertFalse(game.createLandmark(point.id, "파도의 정원"))
+        fixture.trip = fixture.trip.copy(visits = completed.dropLast(1) + completed.last().copy(firstVisitedAtEpochMillis = 6_000_000))
+        assertEquals(4, route.demoRank(fixture.trip.visits))
+        assertFalse(game.createLandmark(point.id, "파도의 정원"))
+        fixture.trip = fixture.trip.copy(visits = completed)
+        assertFalse(game.createLandmark(point.id, "  "))
+        assertEquals(1, listOf(async { game.createLandmark(point.id, " 파도의 정원 ") },
+            async { game.createLandmark(route.places.last().id, "두 번째 랜드마크") }).awaitAll().count { it })
+        val landmark = game.state.value.landmarks.single()
+        assertFalse(game.demoLandmarkFeedback(landmark.pointId, 1, like = true))
+        assertTrue(game.demoLandmarkFeedback(landmark.pointId, 1, like = false))
+        assertFalse(game.demoLandmarkFeedback(landmark.pointId, 1, like = false))
+        assertTrue(game.demoLandmarkFeedback(landmark.pointId, 1, like = true))
+        assertTrue(game.demoLandmarkFeedback(landmark.pointId, 2, like = false))
+        assertEquals(10, fixture.create().state.value.landmarks.single().points)
+        assertEquals(setOf(1), game.state.value.landmarks.single().likes)
+    }
+
     @Test fun ticketsChoicesAndConcurrentDrawsUnlockEachPassOnlyOnce() = runBlocking {
         val fixture = Fixture()
         val game = fixture.create()

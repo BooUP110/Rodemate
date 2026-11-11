@@ -42,8 +42,8 @@ internal class DemoJourney(private val adapter: DemoVehicleAdapter, private val 
     }
 }
 
-internal fun journeySeason(preview: CompanionPreview): Season = LocalSeasonCatalog.first.copy(
-    seasonId = JOURNEY_SEASON_ID, title = preview.seasonTitle,
+internal fun journeySeason(preview: CompanionPreview?): Season = LocalSeasonCatalog.first.copy(
+    seasonId = JOURNEY_SEASON_ID, title = preview?.seasonTitle ?: "로드메이트 탐험 시즌",
     levels = listOf(0L, 15L, 30L, 45L, 60L),
     config = ProgressConfig(tripXp = 5, postcardXp = 10, postDriveXp = 5),
     rewards = listOf(
@@ -52,8 +52,9 @@ internal fun journeySeason(preview: CompanionPreview): Season = LocalSeasonCatal
         SeasonReward("journey-first-discovery", "첫 발견 기념 배지", 2, RewardTrack.FREE, CosmeticRewardType.BADGE, "first-postcard"),
         SeasonReward("journey-palette", "파스텔 여행 테마", 3, RewardTrack.FREE, CosmeticRewardType.THEME),
         SeasonReward("journey-sunset", "노을 테마 미리보기", 4, RewardTrack.PREMIUM, CosmeticRewardType.THEME),
-        SeasonReward("journey-companion", "${preview.profile.displayName} 동반자 팩", 5, RewardTrack.FREE,
-            CosmeticRewardType.COMPANION_ITEM, pack = CompanionPack("journey-companion", preview.profile.id, "travel", "idle-wave")),
+        SeasonReward("journey-companion", "완주 동반자 팩", 5, RewardTrack.FREE,
+            CosmeticRewardType.COMPANION_ITEM, pack = CompanionPack("journey-companion",
+                preview?.profile?.id ?: CompanionProfiles.somsom.id, "travel", "idle-wave")),
         SeasonReward("journey-animated", "움직이는 여행 엽서", 5, RewardTrack.PREMIUM, CosmeticRewardType.COSMETIC),
     ),
 )

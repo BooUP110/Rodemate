@@ -92,15 +92,63 @@ Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형�
 
 내부 APK는 `development/collab-preview/apk/roadmate-collab-debug.apk`에 복사되고 앱 ID는 `io.booup.roadmate.demo.collab`이다. 로컬 `development/`는 Git 제외 경로다. 내부 이미지가 담긴 APK는 가상 콜라보 시연용으로 관리한다.
 
+Android Studio에서 `C:/Users/scspr/WorkSpace/Rodemate`를 프로젝트로 열고 `demoDebug`로 기본 Run을 누르면 `AI 로드메이트`(`io.booup.roadmate.demo`)가 실행된다. 정차 시 동행 홈 전체에 풍경과 캐릭터가 펼쳐진다. `차량 상태`에서 차량 정보를 열고, `강릉 이야기`에서 오리지널 동행과 함께 장소별 일러스트를 본다. 하단의 `시즌 패스`에서 보상과 무료·프리미엄 진행도를 확인한다. `roadmateInternalCollabs`를 지정한 빌드는 치이카와 등 로컬 시연 캐릭터와 콜라보 시즌 화면을 추가하고 `AI 로드메이트 (콜라보 시연)`으로 설치한다. 두 앱은 각각의 저장 데이터를 사용한다.
+
+콜라보 캐릭터와 함께 플레이하려면 에뮬레이터를 켜고 위에서 만든 내부 APK를 에뮬레이터 화면에 끌어다 놓는다. 프로젝트에서 바로 빌드하고 설치하려면 Android Studio 터미널에서 다음 명령을 실행한다.
+
+~~~powershell
+.\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:mergeDemoDebugAssets --rerun :app:installDemoDebug
+~~~
+
+설치 후 앱 목록에서 `AI 로드메이트 (콜라보 시연)`을 열고 `강릉 이야기 → 이야기 시작`을 선택한다. 이미 완주한 경우 `처음부터`를 선택한다.
+
 ### 탐험 지도와 엽서 시연
 
-1. **탐험 지도 → 지역 선택 → 방문 시연**으로 합성 트립을 재생한다. 정차 후 발견 리포트, 해당 구역과 엽서가 열리고 첫 방문 XP가 세 테마 패스에 공유된다.
+1. **탐험 지도 → 서울·강릉·경주·제주 → 다음 목표 → 방문 시연**으로 합성 트립을 재생한다. 정차하면 해당 지점의 엽서가 열리고 다음 원형 포인트가 공개된다. 주행과 첫 방문 XP는 같은 시즌 원장에 쌓인다.
 2. **여행 엽서 펼치기 → 별 스탬프 붙이기**로 미션 보드 첫 줄을 완성한다. **시즌 패스 → 미션 보드**에서 미보유 패스권 한 종을 선택한다.
-3. **시즌 패스**에서 일러스트 포스터를 눌러 해당 패스에 들어간다. 화면 아래 여행 리본의 레벨 표식을 누르면 무료·프리미엄 보상이 열린다. **패스권 뽑기**에서 무료 시연권으로 미보유 패스를 뽑고 봉투를 연다. 강릉과 제주 엽서를 모으면 두 번째 시연권이 열린다.
-4. 네 시연 지역의 첫 방문을 기록하면 시연 설정 기준 최대 레벨에 도달한다. 보유한 프리미엄 패스에서 **Lv.5 표식 → 동반자 팩 열기 → 받기 → 로드메이트로 지정**을 누른다. 다시 방문 시연을 하면 **내 패스함**에 동반자의 첫 동행 엽서가 생긴다.
+3. **시즌 패스**에서 일러스트 포스터를 눌러 해당 패스에 들어간다. 하단 패스 트랙의 보상 칸을 누르면 상세와 수령 상태가 열린다. **패스권 뽑기**에서 무료 시연권으로 미보유 패스를 뽑고 봉투를 연다. 강릉과 제주 엽서를 모으면 두 번째 시연권이 열린다.
+4. 보유한 프리미엄 패스에서 시즌 Lv.5를 달성하면 **Lv.5 완주 동반자 팩 → 동반자 팩 열기 → 받기 → 로드메이트로 지정**을 누른다. 다시 방문 시연을 하면 **내 패스함**에 동반자의 첫 동행 엽서가 생긴다.
+5. 공개된 원을 선택한 뒤 **출발지로**와 **목적지로**를 각각 지정한다. 공개된 지점만으로 이어지는 구간이 금색 선으로 표시된다. 한 지역을 완주하고 시연 순위 3위 안에 들면 **랜드마크 이름 짓기**에서 완주 지점 하나와 이름을 정한다. 등록 후 시연 방문자별로 방문과 좋아요를 추가할 수 있으며, 방문자 한 명당 5 RP를 한 번 적립한다.
 
-내부 시연판에서는 **동반자 체험 → 캐릭터 선택 → 동행 홈에서 체험**으로 정차 중 홈에 캐릭터를 잠시 적용할 수 있다. 캐릭터는 동행 카드에서 좌우로 이동하고, 누르면 멈춰서 인사한다. **체험 끝내기**를 누르거나 홈을 벗어나면 기존 동반자로 돌아간다. [내부 검토용 모션 목업](internal-demo/companion-motion-mockup.gif)
+내부 시연판에서는 **동반자 체험 → 캐릭터 선택 → 동행 홈에서 체험**으로 정차 중 홈에 캐릭터를 잠시 적용할 수 있다. 캐릭터는 홈 풍경에서 좌우로 이동하고, 누르면 멈춰서 인사한다. **체험 끝내기**를 누르거나 홈을 벗어나면 기존 동반자로 돌아간다. [내부 검토용 모션 목업](internal-demo/companion-motion-mockup.gif)
 
-시연 경로는 합성 트립에 연결된다. Production의 위치 응답과 실제 경로 격자는 별도 검증 단계다.
+Demo와 Production 모두 같은 오프라인 지역 경계를 표시한다. 금색 선은 탐험 포인트 사이의 순서다. Demo의 완주 순위와 방문자 반응은 이 기기에 저장되는 시연 데이터다. Production의 자동 출발지 선택과 첫 방문 기록에는 지원되는 위치 공급원의 확인된 장소명이 필요하다.
+
+### 신규 디자인 이미지 적용
+
+원본 PNG를 `app/src/main/assets/journey/design/`에 둔다. 지도 배경 파일명은 `map-seoul.png`, `map-gangneung.png`, `map-gyeongju.png`, `map-jeju.png`다. 홈과 기록에 쓰는 파일은 `home-parked.png`, `care-car.png`, `drive-memory.png`, `drive-empty.png`다. 랜드마크에는 `landmark-creator-ticket.png`와 `landmark-placeholder.png`를, 안개 질감에는 `map-fog.png`를 사용한다. 이미지가 없는 빌드는 기존 엽서와 기본 UI를 사용한다.
+
+### 일반 Android AVD에서 디자인 확인
+
+Android Studio의 일반 휴대폰 AVD를 열고 별도 Demo APK를 설치한다. 가로 1920×1080은 Pleos 전체 화면과 같은 16:9 비율이다. 분할 화면, 차량 SDK 연동 및 주행 제한은 Pleos에서 확인한다.
+
+~~~powershell
+.\gradlew.bat -Pphase86IsolatedAcceptance :app:assembleDemoDebug
+$roadmateAdb = Join-Path $env:LOCALAPPDATA 'Android/Sdk/platform-tools/adb.exe'
+& $roadmateAdb devices -l
+# 위 목록에서 일반 Android AVD의 serial로 바꾼다.
+$designDevice = 'emulator-5556'
+& $roadmateAdb -s $designDevice shell wm size 1080x1920
+& $roadmateAdb -s $designDevice shell cmd window user-rotation lock 1
+& $roadmateAdb -s $designDevice install -r app/build/phase86-acceptance/outputs/apk/demo/debug/app-demo-debug.apk
+& $roadmateAdb -s $designDevice shell am start -n io.booup.roadmate.acceptance.demo/io.booup.roadmate.MainActivity
+~~~
+
+가로 디자인 확인을 마치면 `adb shell wm size reset`과 `adb shell cmd window user-rotation free`를 해당 AVD에 실행해 기본 표시 크기와 자동 회전으로 돌아간다.
+
+### 강릉 이야기 시연
+
+강릉 패스 촬영용 장면, 레이어와 생성 프롬프트는 [이미지 제작 요청서](GANGNEUNG_DEMO_ASSETS.md)를 따른다.
+
+정차 상태의 Demo 홈 일러스트에서 `강릉 이야기`를 누른다. 오죽헌, 경포대, 강문해변, 안목해변 순으로 도착 장면, 주민 대화, 위치 인증 시연, 퍼즐과 단서가 열린다. 각 장을 완료하면 다음 장부터 이어 할 수 있다. `동행 선택`은 기본 동행과 Demo 보유 캐릭터를 보여준다. 내부 콜라보 이미지가 있는 빌드는 치이카와 패스 캐릭터를 주민 장면에 사용한다. 의상 보상의 프리미엄 권한 버튼은 시연 전용이며 결제나 외부 영수증 확인을 호출하지 않는다.
+
+이야기 장면의 16:9 PNG는 `app/src/main/assets/journey/design/`에 `story-gangneung-ojukheon.png`, `story-gangneung-gyeongpodae.png`, `story-gangneung-gangmun.png`, `story-gangneung-anmok.png`로 둔다. 파일을 추가하기 전에는 기존 강릉 엽서 일러스트로 표시한다.
+
+이미지를 만들 때 기존 강릉 엽서의 색감과 붓질을 참고 이미지로 붙인다. 공통 프롬프트는 “동화책 여행 게임에 쓰는 16:9 가로 배경. 오른쪽 중앙은 캐릭터가 들어올 공간, 왼쪽 아래는 대사창이 얹힐 공간으로 두고 글자와 인물 없이 풍경만 그려 주세요.”로 쓴다.
+
+- `story-gangneung-ojukheon.png`에는 오죽헌을 참고한 고택 마당과 대나무 사이로 들어오는 부드러운 늦은 오후 빛을 그린다.
+- `story-gangneung-gyeongpodae.png`에는 경포대 풍경을 참고해 물가가 넓게 보이는 해 질 녘을 그린다. 앱이 달과 반사광을 얹을 수 있도록 오른쪽 물가와 하늘에 여백을 둔다.
+- `story-gangneung-gangmun.png`에는 강문해변을 참고해 모래사장 가까이 부서지는 낮은 파도와 남보라색 저녁 하늘을 그린다.
+- `story-gangneung-anmok.png`에는 안목해변을 참고해 저녁 바다와 멀리 보이는 따뜻한 불빛을 그린다. 엽서를 건네는 결말 장면의 배경이다.
 
 지도는 [geoBoundaries KOR ADM2, 2020](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM2/)의 [고정 버전 단순화 경계](https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/KOR/ADM2/geoBoundaries-KOR-ADM2_simplified.geojson)를 사용한다. 원저자는 geoBoundaries와 citypopulation.de이며 라이선스는 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)이다. 앱의 `journey/korea-districts.json`은 원본 파일의 228개 피처에서 식별자와 링 좌표를 추출해 화면용으로 투영하고 반올림한 파생 자료다. 엽서 배경은 생성한 여행 일러스트다.
