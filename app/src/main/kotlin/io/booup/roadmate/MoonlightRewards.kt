@@ -33,7 +33,7 @@ internal fun MoonlightRoster(current: CompanionProfile, state: JourneyGameState,
 }
 
 @Composable
-internal fun MoonlightWardrobe(state: JourneyGameState, viewModel: RoadmateViewModel, close: () -> Unit) {
+internal fun MoonlightWardrobe(state: JourneyGameState, viewModel: RoadmateViewModel, companion: CompanionProfile, close: () -> Unit) {
     val premium = MOONLIGHT_DEMO_PREMIUM in state.claimed
     AlertDialog(onDismissRequest = close, title = { Text("강릉 패스 의상") }, text = {
         Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
@@ -44,6 +44,9 @@ internal fun MoonlightWardrobe(state: JourneyGameState, viewModel: RoadmateViewM
                 val unlocked = state.moonlightCompleted >= outfit.chapter
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
+                    if (outfit == MoonlightOutfit.JACKET && companion.id == CompanionProfiles.dodam.id) {
+                        OriginalCompanionPortrait(companion, Modifier.size(82.dp), otterMotion = OtterMotion.SAILOR_COAT)
+                    }
                     Column(Modifier.weight(1f)) {
                         Text(outfit.label, style = MaterialTheme.typography.bodyMedium)
                         Text("${if (outfit.premium) "프리미엄" else "무료"} · ${outfit.chapter}장 완료", style = MaterialTheme.typography.bodySmall)

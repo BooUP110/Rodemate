@@ -61,11 +61,12 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
     val guests = cast.filter { it.profile.id != companion.id }
     val guest = guests.takeIf { it.isNotEmpty() }?.let { it[chapter.ordinal % it.size] }
     val outfit = MoonlightOutfit.entries.firstOrNull { it.name == state.moonlightOutfit }
+    val isOtter = companion.id == CompanionProfiles.dodam.id
     val speaker = companion.displayName.substringBefore(" (")
     val isCover = beat == MoonlightBeat.COVER
     val lastChapter = chapter == MoonlightChapter.ANMOK
     val finished = state.moonlightCompleted == MoonlightChapter.entries.size
-    if (wardrobe) MoonlightWardrobe(state, viewModel) { wardrobe = false }
+    if (wardrobe) MoonlightWardrobe(state, viewModel, companion) { wardrobe = false }
     if (roster) MoonlightRoster(companion, state, viewModel) { roster = false }
     BoxWithConstraints(modifier.clipToBounds().background(MoonlightInk)) {
         val wide = maxWidth >= 680.dp
@@ -96,15 +97,18 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
                         .offset(y = if (wide) (15 - index * 15).dp else 0.dp))
                 } }
             }
-        } else if (beat in setOf(MoonlightBeat.COVER, MoonlightBeat.GREETING, MoonlightBeat.CLUE, MoonlightBeat.ARRIVAL)) {
+        } else if (beat in setOf(MoonlightBeat.COVER, MoonlightBeat.GREETING, MoonlightBeat.CLUE, MoonlightBeat.ARRIVAL) ||
+            (beat == MoonlightBeat.MISSION && isOtter)) {
             val pose = Modifier.align(BiasAlignment(if (wide) .59f else .28f, if (wide) -.06f else -.37f))
                 .size(if (wide) minOf(maxWidth * .30f, maxHeight * .48f) else maxHeight * .27f)
             val resident = guest.takeIf { beat == MoonlightBeat.CLUE }
             val residentScene = beat == MoonlightBeat.CLUE
             val actor = if (residentScene) resident?.profile ?: CompanionProfiles.all.first { it.id != companion.id } else companion
             val action = when (beat) {
-                MoonlightBeat.GREETING, MoonlightBeat.CLUE -> OtterMotion.TALK
-                MoonlightBeat.ARRIVAL -> OtterMotion.LOOK_AROUND
+                MoonlightBeat.GREETING -> if (chapter == MoonlightChapter.GANGMUN) OtterMotion.OPEN_LETTER else OtterMotion.TALK
+                MoonlightBeat.CLUE -> OtterMotion.TALK
+                MoonlightBeat.ARRIVAL -> if (chapter == MoonlightChapter.GANGMUN) OtterMotion.LISTEN_TO_SHELL else OtterMotion.LOOK_AROUND
+                MoonlightBeat.MISSION -> OtterMotion.POINT
                 else -> null
             }
             key(chapter, actor.id) { MoonlightActor(actor, if (residentScene) resident else player,
@@ -116,9 +120,16 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
         }
         MoonlightDepth(art, "front", cameraPosition)
         if (beat == MoonlightBeat.RESTORED) {
-            val postcardWidth = if (wide) minOf(maxWidth * .33f, maxHeight * .68f) else maxWidth * .67f
-            RestoredPostcard(chapter, Modifier.align(BiasAlignment(if (wide) .67f else 0f, if (wide) .03f else -.37f))
+            val postcardWidth = if (wide) minOf(maxWidth * .33f, maxHeight * .68f) else maxWidth * if (isOtter) .54f else .67f
+            val postcardX = if (isOtter) { if (wide) .46f else -.65f } else { if (wide) .67f else 0f }
+            RestoredPostcard(chapter, Modifier.align(BiasAlignment(postcardX, if (wide) .03f else -.37f))
                 .width(postcardWidth), atlas)
+            if (isOtter) {
+                val pose = Modifier.align(BiasAlignment(.97f, if (wide) .28f else -.38f))
+                    .size(if (wide) minOf(maxWidth * .18f, maxHeight * .34f) else maxHeight * .19f)
+                val action = if (lastChapter) OtterMotion.OPEN_LETTER else OtterMotion.PICK_UP_POSTCARD
+                key(chapter, "restored-otter") { MoonlightActor(companion, null, outfit, pose, action) }
+            }
         }
 
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(insets)
@@ -240,9 +251,11 @@ private fun MoonlightActor(companion: CompanionProfile, preview: CompanionPrevie
         translationX = (arrival.value - 1f) * 16.dp.toPx()
     }
     Box(motion, contentAlignment = Alignment.Center) {
+        val sailorCoat = companion.id == CompanionProfiles.dodam.id && outfit == MoonlightOutfit.JACKET
         if (preview != null) CompanionPreviewPortrait(preview, Modifier.fillMaxSize())
-        else OriginalCompanionPortrait(companion, Modifier.fillMaxSize(), otterMotion = action)
-        if (outfit != null) Canvas(Modifier.matchParentSize()) {
+        else OriginalCompanionPortrait(companion, Modifier.fillMaxSize(),
+            otterMotion = if (sailorCoat) OtterMotion.SAILOR_COAT else action)
+        if (outfit != null && !sailorCoat) Canvas(Modifier.matchParentSize()) {
             val (color, top) = when (outfit) {
                 MoonlightOutfit.SCARF -> Color(0xFF387A60) to .60f
                 MoonlightOutfit.HAT -> Color(0xFFFFB672) to .23f

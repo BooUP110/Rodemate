@@ -54,9 +54,11 @@ private const val WAVE_POSE = 1
 private const val SMILE_POSE = 2
 private const val BLINK_POSE = 3
 
-internal enum class OtterMotion(val asset: String) {
+internal enum class OtterMotion(val asset: String, val holdLastPose: Boolean = false) {
     WALK_LEFT("walk-left"), WALK_RIGHT("walk-right"), TURN_LEFT("turn-left"), STOP_RIGHT("stop-right"),
-    WAVE("wave"), NOD("nod"), TALK("talk"), THINK("think"), LOOK_AROUND("look-around"), GIVE_POSTCARD("give-postcard");
+    WAVE("wave"), NOD("nod"), TALK("talk"), THINK("think"), LOOK_AROUND("look-around"), GIVE_POSTCARD("give-postcard"),
+    OPEN_LETTER("open-letter", holdLastPose = true), PICK_UP_POSTCARD("pick-up-postcard", holdLastPose = true),
+    LISTEN_TO_SHELL("listen-to-shell"), POINT("point"), SAILOR_COAT("sailor-coat");
 
     val path get() = "original-companions/wave-otter/$asset.webp"
 }
@@ -111,9 +113,10 @@ private fun CompanionArtwork(portrait: String, idleAtlas: String?, description: 
         RoamingCompanionPortrait(atlas, description, modifier, otterRoam)
     } else if (atlas != null) {
         val action = key(otterMotion) { artwork(otterMotion?.path.takeIf { animate }) }
+        val restingAtlas = if (otterMotion == OtterMotion.SAILOR_COAT) action ?: atlas else atlas
         var frame by remember(atlas, action) { mutableIntStateOf(NEUTRAL_POSE) }
         var acting by remember(action) { mutableStateOf(action != null) }
-        LaunchedEffect(atlas, animate, action) {
+        LaunchedEffect(atlas, animate, action, otterMotion) {
             frame = NEUTRAL_POSE
             if (!animate) return@LaunchedEffect
             if (action != null) {
@@ -121,6 +124,7 @@ private fun CompanionArtwork(portrait: String, idleAtlas: String?, description: 
                     frame = pose
                     delay(390)
                 }
+                if (otterMotion?.holdLastPose == true) return@LaunchedEffect
                 acting = false
                 frame = NEUTRAL_POSE
             }
@@ -131,7 +135,8 @@ private fun CompanionArtwork(portrait: String, idleAtlas: String?, description: 
                 frame = NEUTRAL_POSE
             }
         }
-        AtlasFrame(if (acting) action ?: atlas else atlas, frame, modifier.semantics { contentDescription = description })
+        AtlasFrame(if (acting) action ?: restingAtlas else restingAtlas, frame,
+            modifier.semantics { contentDescription = description })
     } else if (still != null) Image(still, contentDescription = description, modifier = modifier)
     else fallback()
 }
