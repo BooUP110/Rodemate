@@ -22,8 +22,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.booup.roadmate.model.RegionId
 import io.booup.roadmate.model.RewardClaimState
@@ -38,7 +40,8 @@ private enum class PassPage(val label: String) {
 internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame, parkedStatus: String,
     modifier: Modifier = Modifier, insets: PaddingValues = PaddingValues(0.dp),
     openAlbum: () -> Unit, openMemory: () -> Unit, openHome: () -> Unit,
-    openStory: (() -> Unit)? = null, tryOnHome: (CompanionPreview) -> Unit, priorityCare: @Composable () -> Unit) {
+    openStory: (() -> Unit)? = null, tryOnHome: (CompanionPreview) -> Unit, priorityCare: @Composable () -> Unit,
+    startAtDraw: Boolean = false) {
     val progress by viewModel.progressUiState.collectAsStateWithLifecycle()
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
     val data by game.state.collectAsStateWithLifecycle()
@@ -47,20 +50,23 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
     val summary = season ?: archive
     val owned = remember(trip.storage.postcards) { game.ownedCards() }
     val stamps = remember(data, trip.storage.postDrive, owned) { game.stamps(data, owned) }
-    var pass by remember { mutableStateOf(JourneyPass.TRAVEL) }
-    var page by remember { mutableStateOf(PassPage.LOBBY) }
+    var pass by remember { mutableStateOf(game.passes.first()) }
+    var page by remember { mutableStateOf(if (startAtDraw) PassPage.DRAW else PassPage.LOBBY) }
     var drawResult by remember { mutableStateOf<JourneyPass?>(null) }
     var opened by remember { mutableStateOf(false) }
     var drawing by remember { mutableStateOf(false) }
     var drawFailed by remember { mutableStateOf(false) }
-    var rewardTier by remember { mutableStateOf<Int?>(null) }
+    var rewardSelection by remember { mutableStateOf<JourneyPassReward?>(null) }
+    var rewardPreview by remember { mutableStateOf<JourneyPassReward?>(null) }
+    val upgraded = data.grants.any { it.pass == pass }
     val world = when (page) {
         PassPage.LOBBY, PassPage.LIBRARY -> JourneyWorld.POST
         PassPage.DRAW -> drawResult?.takeIf { opened }?.world ?: JourneyWorld.POST
         else -> pass.world
     }
     fun show(target: PassPage, themedPass: JourneyPass = pass) {
-        rewardTier = null
+        rewardSelection = null
+        rewardPreview = null
         pass = themedPass
         page = target
     }
@@ -73,11 +79,13 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
 
     BoxWithConstraints(modifier) {
         val margin = if (maxWidth >= 730.dp) 24.dp else 16.dp
-        WorldBackdrop(world, Modifier.matchParentSize())
+        if (page == PassPage.DETAIL) JourneyPassBackdrop(world, upgraded, Modifier.matchParentSize())
+        else WorldBackdrop(world, Modifier.matchParentSize())
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(
             .0f to world.deep.copy(alpha = .93f), .20f to world.deep.copy(alpha = .48f),
             .45f to Color.Transparent, .74f to world.deep.copy(alpha = .09f), 1f to world.deep.copy(alpha = .68f),
         )))
+        PassUpgradeLighting(upgraded && page == PassPage.DETAIL, world.gold, Modifier.matchParentSize())
         Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = margin)) {
             Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = ::goBack, modifier = Modifier.heightIn(min = 48.dp)) {
@@ -111,6 +119,26 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val stageHeight = maxHeight
                 val wide = maxWidth >= 730.dp
+                if (page == PassPage.DETAIL && progress.contentAllowed && summary != null && maxWidth >= 950.dp) {
+                    val featured = rewardPreview
+                        ?: journeyPassRewards.lastOrNull { it.premium && it.xp <= summary.progress.totalXp }
+                        ?: journeyPassRewards.first()
+                    Column(Modifier.align(Alignment.CenterEnd).width(maxWidth * .36f).zIndex(1f)
+                        .clickable(role = Role.Button, onClickLabel = "보상 상세 보기") { rewardSelection = featured },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        RewardItemIllustration(featured.itemArt(), Modifier.size(minOf(stageHeight * .55f, 225.dp)))
+                        Surface(shape = RoundedCornerShape(13.dp), color = world.deep.copy(alpha = .86f)) {
+                            Column(Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("${featured.xp} XP · ${if (featured.premium) "유료 보상" else "무료 보상"}",
+                                    color = world.gold, style = RoadmateType.caption)
+                                Text(featured.titleFor(pass), color = Color.White, style = RoadmateType.cardTitle,
+                                    textAlign = TextAlign.Center, maxLines = 2)
+                            }
+                        }
+                    }
+                }
                 key(page, pass) {
                     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = stageHeight)
                         .padding(top = 12.dp, bottom = 15.dp),
@@ -121,11 +149,11 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
                         } else if (summary == null) {
                             WorldTitle("현재 진행 중인 시즌이 없어요.", Color.White)
                         } else when (page) {
-                            PassPage.LOBBY -> SeasonGallery(summary, data, wide) { show(PassPage.DETAIL, it) }
+                            PassPage.LOBBY -> SeasonGallery(summary, data, wide, game.passes) { show(PassPage.DETAIL, it) }
                             PassPage.DETAIL -> PassJourney(viewModel, game, data, pass, summary, owned, wide,
                                 openAlbum, { show(PassPage.DRAW) }, { show(PassPage.TRIAL) }, { show(PassPage.LIBRARY) }, openHome,
                                 openStory.takeIf { pass == JourneyPass.TRAVEL && !summary.archived },
-                                rewardTier, { rewardTier = it })
+                                rewardSelection, { rewardSelection = null })
                             PassPage.TRIAL -> CompanionTrial(pass, viewModel, wide, tryOnHome) { show(PassPage.DETAIL) }
                             PassPage.STAMPS -> {
                                 val canChoose = game.canChoose(data, stamps) && season != null
@@ -169,10 +197,11 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
                 }
             }
             if (progress.contentAllowed && summary != null && (page == PassPage.LOBBY || page == PassPage.DETAIL)) {
-                val featured = if (page == PassPage.LOBBY) JourneyPass.TRAVEL else pass
-                JourneyTrack(summary, data, featured) { tier ->
+                val featured = if (page == PassPage.LOBBY) game.passes.first() else pass
+                JourneyTrack(summary, data, featured) { reward ->
                     if (page == PassPage.LOBBY) show(PassPage.DETAIL, featured)
-                    rewardTier = tier
+                    rewardPreview = reward
+                    rewardSelection = reward
                 }
             }
         }
@@ -180,9 +209,10 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
 }
 
 @Composable
-private fun SeasonGallery(season: SeasonView, data: JourneyGameState, wide: Boolean, choose: (JourneyPass) -> Unit) {
+private fun SeasonGallery(season: SeasonView, data: JourneyGameState, wide: Boolean, passes: List<JourneyPass>,
+    choose: (JourneyPass) -> Unit) {
     WorldTitle("시즌 패스", Color.White)
-    Text("Lv.${season.progress.currentLevel} · ${data.grants.size}개 패스 보유", color = Color.White, style = RoadmateType.metric)
+    Text("Lv.${season.progress.currentLevel} · 업그레이드 ${data.grants.size}개", color = Color.White, style = RoadmateType.metric)
     val poster: @Composable (JourneyPass, Modifier) -> Unit = { pass, modifier ->
         val world = pass.world
         val shape = RoundedCornerShape(22.dp)
@@ -192,59 +222,56 @@ private fun SeasonGallery(season: SeasonView, data: JourneyGameState, wide: Bool
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(.28f to Color.Transparent,
                 1f to world.deep.copy(alpha = .96f))))
             Column(Modifier.align(Alignment.BottomStart).padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (data.grants.any { it.pass == pass }) WorldEyebrow("프리미엄 보유", world.gold)
+                if (data.grants.any { it.pass == pass }) WorldEyebrow("업그레이드 완료", world.gold)
                 Text(pass.title, color = Color.White, style = RoadmateType.cardTitle)
                 Text("패스 보기  ›", color = world.gold, style = RoadmateType.control)
             }
         }
     }
     if (wide) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        JourneyPass.entries.forEach { poster(it, Modifier.weight(if (it == JourneyPass.TRAVEL) 1.5f else 1f)) }
-    } else JourneyPass.entries.forEach { poster(it, Modifier.fillMaxWidth()) }
-}
-
-private fun journeyRewardTitle(pass: JourneyPass, tier: Int, premium: Boolean) = if (premium) {
-    if (tier == 3) "완주 동반자 팩" else pass.rewards[tier]
-} else when (tier) {
-    1 -> pass.rewards.first()
-    2 -> "${pass.theme} 배지"
-    else -> "완주 기념 소인"
+        passes.forEach { poster(it, Modifier.weight(if (it == JourneyPass.TRAVEL) 1.5f else 1f)) }
+    } else passes.forEach { poster(it, Modifier.fillMaxWidth()) }
 }
 
 @Composable
-private fun JourneyTrack(season: SeasonView, data: JourneyGameState, pass: JourneyPass, select: (Int) -> Unit) {
+private fun JourneyTrack(season: SeasonView, data: JourneyGameState, pass: JourneyPass,
+    select: (JourneyPassReward) -> Unit) {
     val entitled = data.grants.any { it.pass == pass }
-    val levels = season.season.levels.indices.map { index ->
-        val number = index + 1
-        val tier = (1..3).firstOrNull { rewardLevel(it) == number }
-        fun slot(premium: Boolean): List<PassRailReward> {
-            if (tier == null) return emptyList()
-            val state = when {
-                rewardKey(pass, tier, premium) in data.claimed -> RewardClaimState.CLAIMED
-                season.archived -> RewardClaimState.UNCLAIMED_EXPIRED
-                season.progress.currentLevel >= number && (!premium || entitled) -> RewardClaimState.AVAILABLE
-                else -> RewardClaimState.LOCKED
-            }
-            return listOf(PassRailReward(journeyRewardTitle(pass, tier, premium),
-                if (premium) "✦" else "✉", state) { select(tier) })
+    val rewards = journeyPassRewards.map { reward ->
+        val reached = season.progress.totalXp >= reward.xp
+        val state = when {
+            rewardKey(pass, reward.tier, reward.premium) in data.claimed -> RewardClaimState.CLAIMED
+            season.archived -> RewardClaimState.UNCLAIMED_EXPIRED
+            reached && (!reward.premium || entitled) -> RewardClaimState.AVAILABLE
+            else -> RewardClaimState.LOCKED
         }
-        PassRailLevel(number, slot(false), slot(true))
+        PassRailReward(reward.xp, reward.premium, reward.titleFor(pass), reward.itemArt(),
+            state, reward.premium && !entitled && state == RewardClaimState.LOCKED && reached) { select(reward) }
     }
-    GamePassRail(season, levels)
+    GamePassRail(season, rewards, world = pass.world, upgraded = entitled)
+}
+
+private fun JourneyPassReward.itemArt() = when {
+    !premium || xp == 35L || xp == 50L -> PassRewardArt.STAMP
+    tier == 3 -> PassRewardArt.PACK
+    xp == 10L || xp == 45L -> PassRewardArt.ACCESSORY
+    else -> PassRewardArt.POSTCARD
 }
 
 @Composable
 private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyGame, data: JourneyGameState, pass: JourneyPass,
     season: SeasonView, owned: Set<RegionId>, wide: Boolean, openAlbum: () -> Unit, openDraw: () -> Unit,
     openTrial: () -> Unit, openLibrary: () -> Unit, openHome: () -> Unit, openStory: (() -> Unit)?,
-    rewardTier: Int?, selectReward: (Int?) -> Unit) {
+    rewardSelection: JourneyPassReward?, dismissReward: () -> Unit) {
     val world = pass.world
     val premium = data.grants.any { it.pass == pass }
     var finalPack by remember { mutableStateOf(false) }
+    var upgrading by remember { mutableStateOf(false) }
+    var upgradeFailed by remember { mutableStateOf(false) }
     val level = season.progress.currentLevel
     val levels = season.season.levels
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        WorldEyebrow("${pass.theme}   ·   ${if (season.archived) "지난 시즌" else if (premium) "프리미엄 이용 중" else "무료 트랙"}", world.gold)
+        WorldEyebrow("${pass.theme}   ·   ${if (season.archived) "지난 시즌" else if (premium) "✦ 업그레이드 완료" else "시즌 패스"}", world.gold)
         WorldTitle(pass.title, Color.White, Modifier.widthIn(max = 700.dp))
     }
     Spacer(Modifier.height(if (wide) 28.dp else 44.dp))
@@ -255,6 +282,16 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
         JourneyPass.COAST -> coastalPlaces.count { it.id in regions }
     }
     val total = if (pass == JourneyPass.COAST) coastalPlaces.size else journeyPlaces.size
+    val canUpgrade = !premium && !season.archived && viewModel.canSimulateVisit
+    fun upgrade() {
+        upgrading = true
+        upgradeFailed = false
+        viewModel.journeyAction {
+            try {
+                if (previewUpgrade(pass)) dismissReward() else upgradeFailed = true
+            } finally { upgrading = false }
+        }
+    }
     WorldPaper(world, Modifier.align(if (wide) Alignment.Start else Alignment.CenterHorizontally).widthIn(max = 612.dp).fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             WorldEyebrow("✦  여행의 발자취", world.accent)
@@ -263,41 +300,52 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
         Text("${season.progress.totalXp} XP  ·  ${season.nextLevelXp?.let { "다음 레벨까지 $it XP" } ?: "시즌 완주"}",
             color = world.deep, fontSize = 14.sp, lineHeight = 18.sp)
         Text("${pass.subtitle}  $collected/$total", color = world.deep, fontSize = 13.sp, lineHeight = 18.sp)
+        if (upgradeFailed) Text("업그레이드를 저장하지 못했어요. 다시 시도해 주세요.", color = world.deep)
         if (openStory != null) WorldAction("강릉 패스 이야기 시작", world, openStory)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             WorldAction("엽서 도감", world, openAlbum, primary = false)
             WorldAction("동반자 체험", world, openTrial, primary = false)
-            if (!premium && !season.archived) WorldAction("패스권 뽑기", world, openDraw)
+            if (canUpgrade) WorldAction("패스 업그레이드 시연", world, ::upgrade, enabled = !upgrading)
+            if (!premium && !season.archived) WorldAction("패스권 뽑기", world, openDraw, primary = false)
         }
     }
 
-    rewardTier?.let { tier ->
-        AlertDialog(onDismissRequest = { selectReward(null) }, containerColor = world.paper,
-            title = { WorldTitle("Lv.${rewardLevel(tier)} 여행 보상", world.deep) },
+    rewardSelection?.let { reward ->
+        val (xp, tier, isPremium) = reward
+        val claimed = rewardKey(pass, tier, isPremium) in data.claimed
+        val pack = isPremium && tier == 3
+        val reached = season.progress.totalXp >= xp
+        val eligible = !season.archived && reached && (!isPremium || premium) && !claimed
+        AlertDialog(onDismissRequest = dismissReward, containerColor = world.paper,
+            title = { WorldTitle("$xp XP 여행 보상", world.deep) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    listOf(false, true).forEach { isPremium ->
-                        val claimed = rewardKey(pass, tier, isPremium) in data.claimed
-                        val pack = isPremium && tier == 3
-                        val label = journeyRewardTitle(pass, tier, isPremium)
-                        val eligible = !season.archived && level >= rewardLevel(tier) && (!isPremium || premium) && !claimed
-                        if (isPremium) HorizontalDivider(color = world.accent.copy(alpha = .24f))
-                        WorldEyebrow(if (isPremium) "프리미엄 트랙" else "무료 트랙", world.accent)
-                        Text(label, color = world.deep, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text(when {
-                            claimed -> "수령 완료"
-                            eligible -> "받을 수 있어요"
-                            season.archived -> "시즌 종료"
-                            isPremium && !premium -> "프리미엄 패스권 필요"
-                            else -> "레벨 ${rewardLevel(tier)}에서 해금"
-                        }, color = world.deep, fontSize = 14.sp)
-                        if (eligible || (pack && claimed)) WorldAction(if (pack) "동반자 팩 열기" else "보상 받기", world, {
-                            if (pack) { selectReward(null); finalPack = true }
-                            else viewModel.journeyAction { game.claim(pass, tier, isPremium) }
-                        })
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            WorldEyebrow(if (isPremium) "유료 보상" else "무료 보상", world.accent)
+                            Text(reward.titleFor(pass), color = world.deep, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        }
+                        RewardItemIllustration(reward.itemArt(), Modifier.size(94.dp))
+                    }
+                    Text(when {
+                        claimed -> "수령 완료"
+                        eligible -> "받을 수 있어요"
+                        season.archived -> "시즌 종료"
+                        isPremium && !premium && reached -> "패스를 업그레이드하면 수령할 수 있어요."
+                        isPremium && !premium -> "패스 업그레이드와 $xp XP가 필요해요."
+                        else -> "$xp XP에 도달하면 열려요."
+                    }, color = world.deep, fontSize = 14.sp)
+                    if (eligible || (pack && claimed)) WorldAction(if (pack) "동반자 팩 열기" else "보상 받기", world, {
+                        if (pack) { dismissReward(); finalPack = true }
+                        else viewModel.journeyAction { game.claim(pass, tier, isPremium) }
+                    })
+                    if (canUpgrade && isPremium && !claimed) {
+                        if (upgradeFailed) Text("업그레이드를 저장하지 못했어요. 다시 시도해 주세요.", color = world.deep)
+                        WorldAction("패스 업그레이드 시연", world, ::upgrade, enabled = !upgrading)
                     }
                 }
-            }, confirmButton = { WorldAction("닫기", world, { selectReward(null) }, primary = false) })
+            }, confirmButton = { WorldAction("닫기", world, dismissReward, primary = false) })
     }
     if (finalPack) {
         val claimed = rewardKey(pass, 3, true) in data.claimed
@@ -340,7 +388,7 @@ private fun ColumnScope.TravelPost(world: JourneyWorld, tickets: Int, candidates
     }
     WorldPaper(world, Modifier.align(Alignment.CenterHorizontally).widthIn(max = 544.dp).fillMaxWidth()) {
         AnimatedVisibility(revealed) {
-            Text("${result?.title.orEmpty()} 프리미엄 패스권", color = world.deep, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Text("${result?.title.orEmpty()} 업그레이드권", color = world.deep, fontSize = 21.sp, fontWeight = FontWeight.Bold)
         }
         if (revealed) WorldAction("획득한 패스 열기", world, { openPass(result) }, Modifier.fillMaxWidth())
         else if (result != null) {
@@ -449,7 +497,12 @@ private fun PassLibrary(viewModel: RoadmateViewModel, data: JourneyGameState, ar
         WorldEyebrow("PASS COLLECTION  ·  ${data.grants.size}종", world.accent)
         if (data.grants.isEmpty()) Text("여행 우체국 또는 미션 보드에서 패스권을 받을 수 있어요.")
         data.grants.forEach { grant ->
-            Text("${grant.pass.title} · ${if (active) "진행 중" else "종료"} · ${if (grant.drawn) "뽑기" else "선택권"}", color = world.deep)
+            val source = when {
+                grant.upgradePreview -> "업그레이드 시연"
+                grant.drawn -> "뽑기"
+                else -> "선택권"
+            }
+            Text("${grant.pass.title} · ${if (active) "진행 중" else "종료"} · $source", color = world.deep)
             WorldAction("패스 열기", grant.pass.world, { openPass(grant.pass) }, primary = false)
         }
         archive?.let { Text("지난 시즌 · Lv.${it.progress.currentLevel} · 받은 보상 ${data.claimed.size}개") }

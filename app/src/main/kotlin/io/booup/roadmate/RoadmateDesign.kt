@@ -15,9 +15,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -140,7 +146,17 @@ internal fun RoadmateChapter(title: String, file: String, fallback: Int, status:
             }
             priorityCare()
             val scroll = rememberScrollState()
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            val fade = if (scroll.canScrollForward) Modifier
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val top = (size.height - 12.dp.toPx()).coerceAtLeast(0f)
+                    if (top < size.height) drawRect(
+                        Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = top, endY = size.height),
+                        topLeft = Offset(0f, top), size = Size(size.width, size.height - top), blendMode = BlendMode.DstIn,
+                    )
+                } else Modifier
+            Box(Modifier.weight(1f).fillMaxWidth().then(fade)) {
                 Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(
@@ -151,10 +167,6 @@ internal fun RoadmateChapter(title: String, file: String, fallback: Int, status:
                     )) {
                         CompositionLocalProvider(LocalContentColor provides GamePaper, content = content)
                     }
-                }
-                if (scroll.canScrollForward) {
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(22.dp)
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, GameInk.copy(alpha = .82f)))))
                 }
             }
             navigation()

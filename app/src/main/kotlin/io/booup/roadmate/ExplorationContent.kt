@@ -115,7 +115,7 @@ internal fun ExplorationContent(viewModel: RoadmateViewModel, context: VehicleCo
         }
     }
 
-    RoadmateCard {
+    RoadmateCard(Modifier.padding(top = 24.dp)) {
         Text("별자리 경로", style = MaterialTheme.typography.titleMedium)
         Text(if (connection.isNotEmpty()) connection.joinToString(" → ") { it.name }
             else "${origin?.name ?: "출발지 선택"} → ${destination?.name ?: "목적지 선택"}")

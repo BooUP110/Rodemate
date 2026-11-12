@@ -1,5 +1,7 @@
 package io.booup.roadmate
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,15 +12,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -39,10 +45,49 @@ internal val JourneyPass.world get() = when (this) {
 }
 
 @Composable
-internal fun WorldBackdrop(world: JourneyWorld, modifier: Modifier = Modifier) {
+private fun worldIllustration(world: JourneyWorld): ImageBitmap? {
     val image = artwork("pass-worlds/${world.art}.jpg")
+    val demoImage = artwork("tour-worlds/${world.art}.jpg".takeIf { image == null && world != JourneyWorld.TRAVEL })
+    return image ?: demoImage
+}
+
+@Composable
+internal fun WorldBackdrop(world: JourneyWorld, modifier: Modifier = Modifier) {
+    val scene = worldIllustration(world)
     Box(modifier.background(Brush.verticalGradient(listOf(world.accent, world.deep)))) {
-        image?.let { Image(it, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop) }
+        if (scene != null) Image(scene, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+        else if (world != JourneyWorld.TRAVEL) {
+            val scenery = when (world) {
+                JourneyWorld.POST -> "story-gangneung-anmok.png"
+                JourneyWorld.STARS -> "story-gangneung-gyeongpodae.png"
+                else -> "map-gangneung.png"
+            }
+            RoadmateLandscape(scenery, 1, Modifier.matchParentSize(), artwork("journey/postcards.png"))
+        }
+    }
+}
+
+@Composable
+internal fun JourneyPassBackdrop(world: JourneyWorld, upgraded: Boolean, modifier: Modifier) {
+    val standard = when (world) {
+        JourneyWorld.STARS -> "story-gangneung-gyeongpodae.png"
+        JourneyWorld.COAST -> "map-jeju.png"
+        JourneyWorld.TRAVEL, JourneyWorld.POST -> "map-gangneung.png"
+    }
+    PassStageBackdrop(standard, worldIllustration(world), upgraded, modifier)
+}
+
+@Composable
+internal fun PassStageBackdrop(standard: String, paidImage: ImageBitmap?, upgraded: Boolean, modifier: Modifier) {
+    val reveal by animateFloatAsState(if (upgraded && paidImage != null) 1f else 0f, tween(620),
+        label = "pass artwork reveal")
+    Box(modifier.clipToBounds()) {
+        RoadmateLandscape(standard, 1, Modifier.matchParentSize(), artwork("journey/postcards.png"))
+        if (paidImage != null) Image(paidImage, null, Modifier.matchParentSize().graphicsLayer {
+            alpha = reveal
+            scaleX = 1.035f - .035f * reveal
+            scaleY = scaleX
+        }, contentScale = ContentScale.Crop)
     }
 }
 

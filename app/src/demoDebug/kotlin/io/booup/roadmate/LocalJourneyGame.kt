@@ -48,7 +48,9 @@ internal fun localJourneyGame(context: Context, progress: ProgressCoordinator, p
 }
 
 internal fun encodeJourneyGame(state: JourneyGameState) = JSONObject().apply {
-    put("passes", JSONArray(state.grants.map { JSONObject().put("pass", it.pass.name).put("drawn", it.drawn) }))
+    put("passes", JSONArray(state.grants.map {
+        JSONObject().put("pass", it.pass.name).put("drawn", it.drawn).put("upgradePreview", it.upgradePreview)
+    }))
     put("claimed", JSONArray(state.claimed.toList()))
     put("opened", JSONArray(state.openedCards.toList()))
     put("starred", JSONArray(state.starredCards.toList()))
@@ -76,7 +78,7 @@ internal fun decodeJourneyGame(encoded: String): JourneyGameState {
     val claims = entries("claimed", JSONArray::getString).toSet()
     return JourneyGameState(
         grants = entries("passes") { values, index -> values.getJSONObject(index).let {
-            PassGrant(JourneyPass.valueOf(it.getString("pass")), it.getBoolean("drawn"))
+            PassGrant(JourneyPass.valueOf(it.getString("pass")), it.getBoolean("drawn"), it.optBoolean("upgradePreview"))
         } }.distinctBy { it.pass },
         claimed = claims,
         openedCards = entries("opened", JSONArray::getString).toSet(),

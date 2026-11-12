@@ -25,7 +25,7 @@ enum class JourneyPass(val title: String, val subtitle: String, val theme: Strin
     fun companionIds() = companions.map { CompanionId("preview:$it") }
 }
 
-data class PassGrant(val pass: JourneyPass, val drawn: Boolean)
+data class PassGrant(val pass: JourneyPass, val drawn: Boolean, val upgradePreview: Boolean = false)
 data class JourneyMemory(val tripId: String, val region: String, val companion: CompanionId)
 data class JourneyGameState(
     val grants: List<PassGrant> = emptyList(),
@@ -55,7 +55,8 @@ enum class JourneyStamp(val title: String) {
 class JourneyGame(private val storage: () -> TripStorageState,
     private val progress: () -> ProgressUiState, private val controlsAllowed: () -> Boolean,
     private val now: () -> Long, initial: JourneyGameState, private val persist: suspend (JourneyGameState) -> Boolean,
-    private val random: Random = Random.Default) {
+    private val random: Random = Random.Default,
+    internal val passes: List<JourneyPass> = JourneyPass.entries) {
     private val mutex = Mutex()
     private val data = MutableStateFlow(initial)
     val state = data.asStateFlow()
@@ -117,11 +118,12 @@ class JourneyGame(private val storage: () -> TripStorageState,
         return lines.any { line -> line.all { cells[it] in stamps } }
     }
 
-    fun candidates(current: JourneyGameState) = JourneyPass.entries.filter { pass -> current.grants.none { it.pass == pass } }
+    fun candidates(current: JourneyGameState) = passes.filter { pass -> current.grants.none { it.pass == pass } }
     fun tickets(current: JourneyGameState, owned: Set<RegionId> = ownedCards()) =
         (1 + (if (journeyRegionIds(owned).containsAll(coastalPlaces.map { it.id })) 1 else 0) -
             current.grants.count { it.drawn }).coerceAtLeast(0)
-    fun canChoose(current: JourneyGameState, stamps: Set<JourneyStamp>) = current.grants.none { !it.drawn } && hasLine(stamps)
+    fun canChoose(current: JourneyGameState, stamps: Set<JourneyStamp>) =
+        current.grants.none { !it.drawn && !it.upgradePreview } && hasLine(stamps)
 
     suspend fun draw(): JourneyPass? = mutex.withLock {
         val current = data.value
@@ -133,6 +135,12 @@ class JourneyGame(private val storage: () -> TripStorageState,
     suspend fun choose(pass: JourneyPass) = update { current ->
         if (active() && pass in candidates(current) && canChoose(current, stamps(current)))
             current.copy(grants = current.grants + PassGrant(pass, false)) else current
+    }
+
+    suspend fun previewUpgrade(pass: JourneyPass) = update { current ->
+        if (active() && pass in candidates(current))
+            current.copy(grants = current.grants + PassGrant(pass, drawn = false, upgradePreview = true))
+        else current
     }
 
     suspend fun openCard(region: RegionId) = update { current ->
@@ -171,7 +179,8 @@ class JourneyGame(private val storage: () -> TripStorageState,
     suspend fun claim(pass: JourneyPass, tier: Int, premium: Boolean, companion: CompanionId? = null) = update { current ->
         val key = rewardKey(pass, tier, premium)
         val season = progress().active
-        if (season?.season?.seasonId != JOURNEY_SEASON_ID || tier !in 1..3 || season.progress.currentLevel < rewardLevel(tier) ||
+        val reward = journeyPassRewards.firstOrNull { it.tier == tier && it.premium == premium }
+        if (pass !in passes || season?.season?.seasonId != JOURNEY_SEASON_ID || reward == null || season.progress.totalXp < reward.xp ||
             key in current.claimed || (premium && current.grants.none { it.pass == pass })) return@update current
         val finalPack = premium && tier == 3
         if (finalPack && (companion == null || companion !in pass.companionIds())) return@update current
@@ -237,3 +246,29 @@ class JourneyGame(private val storage: () -> TripStorageState,
 
 internal fun rewardLevel(tier: Int) = when (tier) { 1 -> 1; 2 -> 3; else -> 5 }
 internal fun rewardKey(pass: JourneyPass, tier: Int, premium: Boolean) = "${pass.name}:$tier:$premium"
+
+internal data class JourneyPassReward(val xp: Long, val tier: Int, val premium: Boolean, val title: String? = null) {
+    fun titleFor(pass: JourneyPass): String = title ?: if (premium) {
+        if (tier == 3) "완주 동반자 팩" else pass.rewards[tier]
+    } else when (tier) {
+        1 -> pass.rewards.first()
+        2 -> "${pass.theme} 배지"
+        else -> "완주 기념 소인"
+    }
+}
+
+// Free chapter rewards replace that XP marker's paid reward. Existing tier IDs are kept for saved claims.
+internal val journeyPassRewards = listOf(
+    JourneyPassReward(5, 1, true),
+    JourneyPassReward(10, 4, true, "여행 수첩 스티커"),
+    JourneyPassReward(15, 5, true, "노을 테마"),
+    JourneyPassReward(20, 1, false),
+    JourneyPassReward(25, 2, true),
+    JourneyPassReward(30, 6, true, "여행 배경 색상"),
+    JourneyPassReward(35, 7, true, "별자리 소인"),
+    JourneyPassReward(40, 2, false),
+    JourneyPassReward(45, 8, true, "조개 스티커"),
+    JourneyPassReward(50, 9, true, "별빛 엽서 스탬프"),
+    JourneyPassReward(55, 3, true),
+    JourneyPassReward(60, 3, false),
+)

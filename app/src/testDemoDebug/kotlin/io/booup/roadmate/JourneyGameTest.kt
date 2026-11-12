@@ -117,7 +117,7 @@ class JourneyGameTest {
         val companion = pass.companionIds().first()
         assertFalse(game.claim(pass, 3, true, companion))
         assertFalse(game.equip(companion))
-        fixture.level = 5
+        fixture.xp = 60
         assertTrue(game.claim(pass, 2, true))
         assertTrue(game.claim(pass, 3, true, companion))
         assertFalse(game.claim(pass, 3, true, companion))
@@ -131,17 +131,37 @@ class JourneyGameTest {
         assertEquals(companion, fixture.create().state.value.memories.single().companion)
     }
 
+    @Test fun previewUpgradeOpensReachedPaidRewardsWithoutSpendingDrawOrChoice() = runBlocking {
+        val fixture = Fixture()
+        val game = fixture.create()
+        val pass = JourneyPass.TRAVEL
+        val line = setOf(JourneyStamp.DISCOVERY, JourneyStamp.OPEN, JourneyStamp.STAR)
+        assertFalse(game.previewUpgrade(pass))
+        fixture.parked = true
+        assertFalse(game.claim(pass, 1, premium = true))
+        assertTrue(game.previewUpgrade(pass))
+        assertFalse(game.previewUpgrade(pass))
+        assertEquals(1, game.tickets(game.state.value))
+        assertTrue(game.canChoose(game.state.value, line))
+        assertFalse(game.claim(pass, 2, premium = true))
+        assertFalse(game.claim(JourneyPass.COAST, 1, premium = true))
+        assertTrue(game.claim(pass, 1, premium = true))
+        assertTrue(game.claim(pass, 1, premium = false))
+        assertTrue(fixture.create().state.value.grants.single().upgradePreview)
+    }
+
     private class Fixture {
         var trip = TripStorageState(loaded = true, consents = mapOf(ConsentScope.TRIP_HISTORY to
             ConsentRecord(ConsentScope.TRIP_HISTORY, true, 1, null, DataSource.SIMULATED, "test")))
         var parked = false
         var writable = true
-        var level = 1
+        var xp = 20L
         var saved = JourneyGameState()
         private val season = Season(JOURNEY_SEASON_ID, "여행", 1, 1000,
             listOf(0, 15, 30, 45, 60), emptyList(), emptyList())
         fun create() = JourneyGame({ trip }, {
-            ProgressUiState(active = SeasonView(season, SeasonProgress(season.seasonId, emptySet(), currentLevel = level),
+            ProgressUiState(active = SeasonView(season, SeasonProgress(season.seasonId, emptySet(),
+                totalXp = xp, currentLevel = season.levels.count { it <= xp }),
                 null, false, emptyList(), emptyList()))
         }, { parked }, { 100 }, saved, { updated -> writable.also { if (it) saved = updated } }, Random(7))
 
@@ -150,6 +170,12 @@ class JourneyGameTest {
             trip = trip.copy(postcards = trip.postcards + Postcard(PostcardKey(place.id), place.name,
                 null, false, 20, calendar, RegionEvidenceSource.DEMO))
         }
+    }
+
+    @Test fun paidAndFreeRewardsHaveSeparateMilestones() {
+        assertEquals((5L..60L step 5).toList(), journeyPassRewards.map { it.xp })
+        assertEquals(listOf(20L, 40L, 60L), journeyPassRewards.filterNot { it.premium }.map { it.xp })
+        assertEquals(9, journeyPassRewards.count { it.premium })
     }
 
     @Test fun deletedTripsAndRevokedConsentRemoveJourneyMemoriesWithoutLosingPasses() = runBlocking {

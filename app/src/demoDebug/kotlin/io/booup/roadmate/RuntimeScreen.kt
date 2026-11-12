@@ -5,4 +5,4 @@ import androidx.compose.runtime.Composable
 @Composable
 fun RuntimeScreen(viewModel: RoadmateViewModel) =
     RoadmateApp(viewModel, simulationLabel = "DEMO · SIMULATED", demoControls = viewModel.developerPanel,
-        parkSimulation = viewModel.parkSimulation)
+        parkSimulation = viewModel.parkSimulation, screenTour = { visible, close -> DemoScreenTour(visible, close) })

@@ -31,10 +31,16 @@ private enum class RoadmatePage(val label: String, val symbol: String, val art: 
     DEMO("시연 선택", "▷", "home-parked.png", "함께 체험할 이야기"),
 }
 
+internal enum class TourStop(val label: String) {
+    HOME("동행"), STORY("강릉 이야기"), MAP("안개 지도"), ALBUM("엽서"),
+    REWARDS("시즌 보상"), DRAW("패스권 뽑기"), VEHICLE("차량 상태"),
+}
+
 /** Demo controls are supplied only by the variant composition root. */
 @Composable
-fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
-    demoControls: (@Composable () -> Unit)? = null, parkSimulation: (() -> Unit)? = null) {
+internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
+    demoControls: (@Composable () -> Unit)? = null, parkSimulation: (() -> Unit)? = null,
+    screenTour: (@Composable (visible: Boolean, close: () -> Unit) -> Unit)? = null, tourStop: TourStop? = null) {
     val context by viewModel.state.collectAsStateWithLifecycle()
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
     val post by viewModel.postDriveUiState.collectAsStateWithLifecycle()
@@ -45,14 +51,23 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
     val gameState = game?.state?.collectAsStateWithLifecycle()?.value
     val previews = viewModel.companionPreviews
     val activePreview = previews.firstOrNull { it.profile.id == care.companion.id }
-    var page by rememberSaveable { mutableStateOf(RoadmatePage.HOME) }
+    val startPage = when (tourStop) {
+        TourStop.MAP -> RoadmatePage.MAP
+        TourStop.ALBUM -> RoadmatePage.COLLECTION
+        TourStop.REWARDS, TourStop.DRAW -> RoadmatePage.SEASON
+        else -> RoadmatePage.HOME
+    }
+    var page by rememberSaveable { mutableStateOf(startPage) }
+    var touring by remember { mutableStateOf(false) }
     var homeTrial by remember { mutableStateOf<CompanionPreview?>(null) }
     var returnToMap by remember { mutableStateOf(false) }
     var mapPlace by remember { mutableStateOf<JourneyPlace?>(null) }
-    var expedition by remember { mutableStateOf(Expedition.SEOUL) }
+    var expedition by remember { mutableStateOf(if (tourStop == TourStop.MAP) Expedition.GANGNEUNG else Expedition.SEOUL) }
     var albumPlace by remember { mutableStateOf<JourneyPlace?>(null) }
-    var storyOpen by rememberSaveable { mutableStateOf(false) }
-    var storyBeat by rememberSaveable { mutableStateOf(MoonlightBeat.COVER) }
+    var storyOpen by rememberSaveable { mutableStateOf(tourStop == TourStop.STORY) }
+    var storyBeat by rememberSaveable {
+        mutableStateOf(if (tourStop == TourStop.STORY) MoonlightBeat.GREETING else MoonlightBeat.COVER)
+    }
     var storyChapter by rememberSaveable { mutableStateOf(MoonlightChapter.OJUKHEON) }
     var storyVisit by rememberSaveable { mutableStateOf(false) }
     var storyAction by remember { mutableStateOf(false) }
@@ -70,6 +85,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
     val clock = remember { AndroidContextClock() }
     val full = DrivingPresentationPolicy().mode(context, clock.now()) == DrivingPresentationMode.FULL_PARKED
     val canBrowse = full && post.contentAllowed
+    val canStartTour = canBrowse && !journey.running && context.mode == RuntimeMode.DEMO && screenTour != null
     val modeLabel = if (previews.isNotEmpty()) "내부 콜라보 시연"
         else simulationLabel ?: "실제 차량 정보 · 읽기 전용"
     val showMap: (JourneyPlace?) -> Unit = { place ->
@@ -85,7 +101,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
         page = target
     }
     val navigation: @Composable () -> Unit = {
-        RoadmateDock {
+        if (tourStop == null) RoadmateDock {
             RoadmatePage.entries.filter { it != RoadmatePage.DEMO || demoControls != null }.forEach { target ->
                 RoadmateDockItem(target.label, target.symbol, selected = page == target,
                     enabled = canBrowse || target in setOf(RoadmatePage.HOME, RoadmatePage.DEMO)) { navigate(target) }
@@ -97,7 +113,11 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
             { viewModel.selectCompanion(it) }, showCompanionPicker = false)
     }
     LaunchedEffect(canBrowse) {
-        if (!canBrowse) { page = RoadmatePage.HOME; focus.clearFocus(force = true); keyboard?.hide() }
+        if (!canBrowse) {
+            if (tourStop == null) page = RoadmatePage.HOME
+            focus.clearFocus(force = true)
+            keyboard?.hide()
+        }
         else viewModel.restoreJourneyCompanion()
     }
     LaunchedEffect(page, canBrowse) {
@@ -119,7 +139,20 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
     }
     BackHandler(storyOpen && canBrowse && !storyVisit && !storyAction) { storyOpen = false }
     RoadmateTheme {
+        if (touring && screenTour != null) {
+            screenTour(canStartTour) {
+                touring = false
+                page = RoadmatePage.DEMO
+            }
+            if (canStartTour) return@RoadmateTheme
+        }
         Scaffold { insets ->
+            if (tourStop == TourStop.VEHICLE && canBrowse) {
+                RoadmateChapter("차량 상태", "home-parked.png", 3, modeLabel, insets, navigation, priorityCare) {
+                    HomeVehicleCard(context, demo = true, viewModel::readParkedWarnings, Modifier.widthIn(max = 540.dp))
+                }
+                return@Scaffold
+            }
             if (storyOpen && canPlayStory && canBrowse) {
                 val recorded = trip.storage.visits.any {
                     it.source == RegionEvidenceSource.DEMO && it.regionId == storyChapter.place.id
@@ -186,13 +219,15 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
             }
             val collabSeason = progress.active?.season?.seasonId == JOURNEY_SEASON_ID ||
                 progress.archived.any { it.season.seasonId == JOURNEY_SEASON_ID }
-            if (page == RoadmatePage.SEASON && canBrowse && game != null && previews.isNotEmpty() && collabSeason) {
+            if (page == RoadmatePage.SEASON && canBrowse && game != null && collabSeason &&
+                (previews.isNotEmpty() || tourStop == TourStop.DRAW)) {
                 JourneyPassContent(viewModel, game, "정차 · ${UiCopy.connection(context.connection.status)}",
                     modifier = Modifier.fillMaxSize(), insets = insets,
                     openAlbum = { albumPlace = null; page = RoadmatePage.COLLECTION },
                     openMemory = { page = RoadmatePage.MEMORY }, openHome = { page = RoadmatePage.HOME },
                     openStory = openStory.takeIf { canPlayStory && !journey.running },
                     tryOnHome = { homeTrial = it; page = RoadmatePage.HOME },
+                    startAtDraw = tourStop == TourStop.DRAW,
                     priorityCare = {
                         CareContent(care, { viewModel.respond(it) }, { id, revision -> viewModel.displayed(id, revision) },
                             { viewModel.selectCompanion(it) }, showCompanionPicker = false)
@@ -210,7 +245,14 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
                 key(page) {
                     RoadmateChapter(page.title, art, artIndex, modeLabel, insets, navigation, priorityCare) {
                         when (page) {
-                            RoadmatePage.DEMO -> demoControls?.invoke()
+                            RoadmatePage.DEMO -> {
+                                if (canStartTour) RoadmateCard(Modifier.widthIn(max = 780.dp), compact = true) {
+                                    Text("카펫 둘러보기", style = RoadmateType.cardTitle)
+                                    Text("동행부터 차량 상태까지, 7개 화면을 바로 열어 볼 수 있어요.")
+                                    GameButton("화면 둘러보기 시작", { touring = true }, primary = true)
+                                }
+                                demoControls?.invoke()
+                            }
                             RoadmatePage.MEMORY -> PostDriveContent(viewModel,
                                 openAlbum = { albumPlace = it; page = RoadmatePage.COLLECTION },
                                 openMap = showMap,
@@ -269,8 +311,9 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
 }
 
 @Composable
-private fun HomeVehicleCard(context: VehicleContext, demo: Boolean, readWarnings: suspend () -> AdapterResult<List<String>>) {
-    RoadmateCard(compact = true, tinted = true) {
+private fun HomeVehicleCard(context: VehicleContext, demo: Boolean, readWarnings: suspend () -> AdapterResult<List<String>>,
+    modifier: Modifier = Modifier) {
+    RoadmateCard(modifier, compact = true, tinted = true) {
         val car = artwork("journey/design/care-car.png")
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f)) {

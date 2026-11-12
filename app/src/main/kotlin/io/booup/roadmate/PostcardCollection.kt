@@ -186,6 +186,7 @@ internal fun PostcardArtwork(place: JourneyPlace?, atlas: ImageBitmap?, preview:
         if (place != null && atlas != null) AtlasFrame(atlas, place.art, Modifier.matchParentSize(), fill = true)
         else RoadmateLandscape("drive-memory.png", place?.art ?: 2, Modifier.matchParentSize(), atlas)
         if (preview != null) CompanionPreviewPortrait(preview, Modifier.align(Alignment.BottomEnd).size(102.dp), animate)
-        else if (companion != null) OriginalCompanionPortrait(companion, Modifier.align(Alignment.BottomEnd).size(102.dp), animate)
+        else if (companion != null) OriginalCompanionPortrait(companion, Modifier.align(Alignment.BottomEnd).size(102.dp),
+            animate, otterMotion = OtterMotion.GIVE_POSTCARD)
     }
 }

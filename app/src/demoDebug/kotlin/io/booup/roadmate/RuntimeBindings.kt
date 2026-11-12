@@ -56,10 +56,11 @@ object RuntimeBindings {
             localCompanionPreviews(context.assets), context)
     fun create(scope: CoroutineScope, clock: ContextClock, storageRoot: File? = null,
         encryption: io.booup.roadmate.storage.StorageEncryption? = null,
-        previews: List<CompanionPreview> = emptyList(), appContext: android.content.Context? = null): RuntimeBinding {
+        previews: List<CompanionPreview> = emptyList(), appContext: android.content.Context? = null,
+        tourStorage: FileTripRepository? = null): RuntimeBinding {
         val adapter = DemoVehicleAdapter(clock).apply { select(DemoScenarioId.A_NORMAL) }
         val repository = VehicleContextStore(adapter, RuntimeMode.DEMO, clock, scope)
-        val storage = storageRoot?.let { FileTripRepository(File(it, "roadmate-demo"), RuntimeMode.DEMO,
+        val storage = tourStorage ?: storageRoot?.let { FileTripRepository(File(it, "roadmate-demo"), RuntimeMode.DEMO,
             progressEngine = SafeProgressEngine(explorationRewards = true),
             encryption = requireNotNull(encryption)) }
         val trips = storage?.let { TripCoordinator(it,
@@ -72,9 +73,17 @@ object RuntimeBindings {
         val postController = post?.let { PostDriveDemoController(adapter, requireNotNull(trips), it, requireNotNull(storage), scope) }
         val progress=post?.let { ProgressCoordinator(requireNotNull(storage),RuntimeMode.DEMO,clock,{it.controlsAllowed()},
             initialSeasons = listOf(journeySeason(previews.firstOrNull())),
-            catalog = if (previews.isEmpty()) ProgressDemoScenarios.catalog else null, seedOnlyWhenEmpty = true) }
-        val game = if (journey != null && appContext != null && progress != null)
-            localJourneyGame(appContext, progress, post, clock) else null
+            catalog = if (previews.isEmpty() && tourStorage == null) ProgressDemoScenarios.catalog else null, seedOnlyWhenEmpty = true) }
+        val game = when {
+            tourStorage != null && progress != null -> JourneyGame(
+                storage = { tourStorage.state.value }, progress = { progress.uiState.value },
+                controlsAllowed = requireNotNull(post)::controlsAllowed, now = { clock.now().epochMillis },
+                initial = JourneyGameState(),
+                persist = { true }, passes = listOf(JourneyPass.COAST, JourneyPass.STARS),
+            )
+            journey != null && appContext != null && progress != null -> localJourneyGame(appContext, progress, post, clock)
+            else -> null
+        }
         val progressController=progress?.let { ProgressDemoController(adapter,requireNotNull(trips),requireNotNull(storage),storage,requireNotNull(post),it,clock,scope) }
         val input = DemoLaunchInput(adapter, repository, clock, scope, controller, postController,progressController)
         return RuntimeBinding(

@@ -3,6 +3,7 @@ package io.booup.roadmate.demo
 import io.booup.roadmate.CompanionPreview
 import io.booup.roadmate.JOURNEY_SEASON_ID
 import io.booup.roadmate.JourneyPlace
+import io.booup.roadmate.journeyPassRewards
 import io.booup.roadmate.model.*
 import io.booup.roadmate.postdrive.PostDriveCoordinator
 import io.booup.roadmate.progress.LocalSeasonCatalog
@@ -44,17 +45,28 @@ internal class DemoJourney(private val adapter: DemoVehicleAdapter, private val 
 
 internal fun journeySeason(preview: CompanionPreview?): Season = LocalSeasonCatalog.first.copy(
     seasonId = JOURNEY_SEASON_ID, title = preview?.seasonTitle ?: "로드메이트 탐험 시즌",
-    levels = listOf(0L, 15L, 30L, 45L, 60L),
+    levels = listOf(0L) + journeyPassRewards.map { it.xp },
     config = ProgressConfig(tripXp = 5, postcardXp = 10, postDriveXp = 5),
-    rewards = listOf(
-        SeasonReward("journey-stamp", "여행의 시작 배지", 1, RewardTrack.FREE, CosmeticRewardType.BADGE),
-        SeasonReward("journey-frame", "엽서 테두리", 2, RewardTrack.PREMIUM, CosmeticRewardType.THEME),
-        SeasonReward("journey-first-discovery", "첫 발견 기념 배지", 2, RewardTrack.FREE, CosmeticRewardType.BADGE, "first-postcard"),
-        SeasonReward("journey-palette", "파스텔 여행 테마", 3, RewardTrack.FREE, CosmeticRewardType.THEME),
-        SeasonReward("journey-sunset", "노을 테마 미리보기", 4, RewardTrack.PREMIUM, CosmeticRewardType.THEME),
-        SeasonReward("journey-companion", "완주 동반자 팩", 5, RewardTrack.FREE,
-            CosmeticRewardType.COMPANION_ITEM, pack = CompanionPack("journey-companion",
-                preview?.profile?.id ?: CompanionProfiles.somsom.id, "travel", "idle-wave")),
-        SeasonReward("journey-animated", "움직이는 여행 엽서", 5, RewardTrack.PREMIUM, CosmeticRewardType.COSMETIC),
-    ),
+    rewards = journeyPassRewards.mapIndexed { index, reward ->
+        val level = index + 2 // The first season level starts at zero XP.
+        val track = if (reward.premium) RewardTrack.PREMIUM else RewardTrack.FREE
+        when (reward.xp) {
+            5L -> SeasonReward("journey-frame", "엽서 테두리", level, track, CosmeticRewardType.THEME)
+            15L -> SeasonReward("journey-sunset", "노을 테마 미리보기", level, track, CosmeticRewardType.THEME)
+            20L -> SeasonReward("journey-stamp", "여행의 시작 배지", level, track, CosmeticRewardType.BADGE)
+            25L -> SeasonReward("journey-animated", "움직이는 여행 엽서", level, track, CosmeticRewardType.COSMETIC)
+            40L -> SeasonReward("journey-first-discovery", "첫 발견 기념 배지", level, track, CosmeticRewardType.BADGE, "first-postcard")
+            55L -> SeasonReward("journey-animated-frame", "별빛 엽서 액자", level, track, CosmeticRewardType.THEME)
+            60L -> SeasonReward("journey-companion", "완주 동반자 팩", level, track, CosmeticRewardType.COMPANION_ITEM,
+                pack = CompanionPack("journey-companion", preview?.profile?.id ?: CompanionProfiles.somsom.id, "travel", "idle-wave"))
+            else -> {
+                val type = when (reward.xp) {
+                    30L -> CosmeticRewardType.THEME
+                    35L, 50L -> CosmeticRewardType.BADGE
+                    else -> CosmeticRewardType.COSMETIC
+                }
+                SeasonReward("journey-reward-${reward.xp}", requireNotNull(reward.title), level, track, type)
+            }
+        }
+    },
 )

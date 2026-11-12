@@ -102,11 +102,16 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
             val resident = guest.takeIf { beat == MoonlightBeat.CLUE }
             val residentScene = beat == MoonlightBeat.CLUE
             val actor = if (residentScene) resident?.profile ?: CompanionProfiles.all.first { it.id != companion.id } else companion
+            val action = when (beat) {
+                MoonlightBeat.GREETING, MoonlightBeat.CLUE -> OtterMotion.TALK
+                MoonlightBeat.ARRIVAL -> OtterMotion.LOOK_AROUND
+                else -> null
+            }
             key(chapter, actor.id) { MoonlightActor(actor, if (residentScene) resident else player,
-                outfit.takeUnless { residentScene }, pose) }
+                outfit.takeUnless { residentScene }, pose, action) }
             if (residentScene && wide) {
                 val listener = Modifier.align(BiasAlignment(.04f, .07f)).size(minOf(maxWidth * .22f, maxHeight * .36f))
-                key(chapter, "listener") { MoonlightActor(companion, player, outfit, listener) }
+                key(chapter, "listener") { MoonlightActor(companion, player, outfit, listener, OtterMotion.THINK) }
             }
         }
         MoonlightDepth(art, "front", cameraPosition)
@@ -226,7 +231,8 @@ private fun MoonlightButton(label: String, enabled: Boolean = true, action: () -
 }
 
 @Composable
-private fun MoonlightActor(companion: CompanionProfile, preview: CompanionPreview?, outfit: MoonlightOutfit?, modifier: Modifier) {
+private fun MoonlightActor(companion: CompanionProfile, preview: CompanionPreview?, outfit: MoonlightOutfit?, modifier: Modifier,
+    action: OtterMotion? = null) {
     val arrival = remember { Animatable(0f) }
     LaunchedEffect(Unit) { arrival.animateTo(1f, tween(1450, easing = FastOutSlowInEasing)) }
     val motion = modifier.graphicsLayer {
@@ -235,7 +241,7 @@ private fun MoonlightActor(companion: CompanionProfile, preview: CompanionPrevie
     }
     Box(motion, contentAlignment = Alignment.Center) {
         if (preview != null) CompanionPreviewPortrait(preview, Modifier.fillMaxSize())
-        else OriginalCompanionPortrait(companion, Modifier.fillMaxSize())
+        else OriginalCompanionPortrait(companion, Modifier.fillMaxSize(), otterMotion = action)
         if (outfit != null) Canvas(Modifier.matchParentSize()) {
             val (color, top) = when (outfit) {
                 MoonlightOutfit.SCARF -> Color(0xFF387A60) to .60f
