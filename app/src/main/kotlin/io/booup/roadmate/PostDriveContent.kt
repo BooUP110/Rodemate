@@ -18,7 +18,7 @@ import java.time.ZoneOffset
 /** UI owns navigation/drafts/dialogs only. Coordinators revalidate every action. */
 @Composable
 fun PostDriveContent(viewModel: RoadmateViewModel, openAlbum: ((JourneyPlace?) -> Unit)? = null,
-    openMap: ((JourneyPlace?) -> Unit)? = null, openSeason: (() -> Unit)? = null) {
+    openMap: ((JourneyPlace?) -> Unit)? = null, openSeason: (() -> Unit)? = null, showHeader: Boolean = true) {
     val state by viewModel.postDriveUiState.collectAsStateWithLifecycle()
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
     val care by viewModel.uiState.collectAsStateWithLifecycle()
@@ -30,138 +30,132 @@ fun PostDriveContent(viewModel: RoadmateViewModel, openAlbum: ((JourneyPlace?) -
     var deleteTarget by remember { mutableStateOf<String?>(null) }
     var memoryConfirmation by remember(state.session.tripId) { mutableStateOf<TripReflection?>(null) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        RoadmateStoryHeader("드라이브 기억", "함께 달린 순간과 직접 남긴 이야기를 모아요.", "drive-memory.png", 2)
+        if (showHeader) RoadmateStoryHeader("드라이브 기억", "함께 달린 순간과 직접 남긴 이야기를 모아요.", "drive-memory.png", 2)
         StorageNotice(state.error)
-        MemoryRecallContent(viewModel)
-        state.session.card?.let { card ->
-            val entry = trip.storage.postcards.firstOrNull { it.sourceTripId == card.tripId }
-            val place = journeyPlace(entry?.key?.regionId)
-            RoadmateCard(tinted = true) {
-                RoadmateBadge(if (card.source == DataSource.SIMULATED) "SIMULATED · 기억 카드" else "기억 카드")
-                Text(UiCopy.date(card.startedAtEpochMillis), style = MaterialTheme.typography.titleLarge)
-                Text("드라이브 기록 시간  " + UiCopy.duration(card.durationMillis), style = MaterialTheme.typography.headlineMedium)
-                Text("종료 " + UiCopy.date(card.endedAtEpochMillis) + " · UTC", style = MaterialTheme.typography.bodyMedium)
-                card.distanceMeters?.let { Text("확인된 거리  " + it + " m") }
-                card.startLabel?.let { Text("출발  " + if (card.source == DataSource.SIMULATED) "시연 출발지" else it) }
-                card.endLabel?.let { Text("도착  " + if (card.source == DataSource.SIMULATED) "시연 도착지" else it) }
-                Text("달력 기준 " + UiCopy.season(card.calendar.season) + " · " + card.calendar.zoneId, style = MaterialTheme.typography.bodyMedium)
-                if (viewModel.journeyGame != null) {
-                    val xp = trip.storage.progression.ledger.filter { it.sourceTripId == card.tripId && it.seasonId == JOURNEY_SEASON_ID }
-                        .sumOf { it.awardedXp }
-                    Text("여행 시즌 +$xp XP" + (place?.let { " · ${it.name} 첫 방문" } ?: ""))
-                    if (place != null && openMap != null) TextButton(onClick = { openMap(place) }) { Text("탐험 지도에서 보기") }
-                    if (openSeason != null) TextButton(onClick = openSeason) { Text("시즌 보상 보기") }
-                }
-                if (card.careSummary.isNotEmpty()) {
-                    Text("이번 드라이브의 안내", style = MaterialTheme.typography.titleMedium)
-                    card.careSummary.forEach { summary ->
-                        Text(when (summary.rule) {
-                            RuleId.LIGHT -> "전조등 안내"; RuleId.HVAC -> "공조 제안"
-                            RuleId.REST -> "휴식 권장"; RuleId.WARNING -> "차량 경고"
-                        } + " · " + summary.occurrences + "회", style = MaterialTheme.typography.bodyMedium)
+        RoadmateJournalColumns(first = { MemoryRecallContent(viewModel) }, second = {
+            state.session.card?.let { card ->
+                val entry = trip.storage.postcards.firstOrNull { it.sourceTripId == card.tripId }
+                val place = journeyPlace(entry?.key?.regionId)
+                RoadmateCard(tinted = true) {
+                    RoadmateBadge(if (card.source == DataSource.SIMULATED) "SIMULATED · 기억 카드" else "기억 카드")
+                    Text(UiCopy.date(card.startedAtEpochMillis), style = MaterialTheme.typography.titleLarge)
+                    Text("드라이브 기록 시간  " + UiCopy.duration(card.durationMillis), style = MaterialTheme.typography.headlineMedium)
+                    Text("종료 " + UiCopy.date(card.endedAtEpochMillis) + " · UTC", style = MaterialTheme.typography.bodyMedium)
+                    card.distanceMeters?.let { Text("확인된 거리  " + it + " m") }
+                    card.startLabel?.let { Text("출발  " + if (card.source == DataSource.SIMULATED) "시연 출발지" else it) }
+                    card.endLabel?.let { Text("도착  " + if (card.source == DataSource.SIMULATED) "시연 도착지" else it) }
+                    Text("달력 기준 " + UiCopy.season(card.calendar.season) + " · " + card.calendar.zoneId, style = MaterialTheme.typography.bodyMedium)
+                    if (viewModel.journeyGame != null) {
+                        val xp = trip.storage.progression.ledger.filter { it.sourceTripId == card.tripId && it.seasonId == JOURNEY_SEASON_ID }
+                            .sumOf { it.awardedXp }
+                        Text("여행 시즌 +$xp XP" + (place?.let { " · ${it.name} 첫 방문" } ?: ""))
+                        if (place != null && openMap != null) TextButton(onClick = { openMap(place) }) { Text("탐험 지도에서 보기") }
+                        if (openSeason != null) TextButton(onClick = openSeason) { Text("시즌 보상 보기") }
                     }
-                    Text("안내가 발생한 기록이에요. 실제 행동을 수행했다는 뜻은 아니에요.", style = MaterialTheme.typography.bodyMedium)
-                }
-                card.reflection?.let { reflection ->
-                    HorizontalDivider()
-                    Text("직접 남긴 이야기", style = MaterialTheme.typography.titleMedium)
-                    reflection.mood?.let { Text(UiCopy.mood(it)) }
-                    reflection.text?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
-                    Text(if (reflection.persistence == ReflectionPersistence.TRIP_LOCAL) "이 드라이브에 저장됨" else "현재 화면에서만 보기",
-                        style = MaterialTheme.typography.labelMedium)
-                }
-            }
-            state.session.postcard?.let { postcard ->
-                RoadmateCard {
-                    RoadmateBadge(if (postcard.source == RegionEvidenceSource.DEMO) "SIMULATED · 지역 엽서" else "지역 엽서")
-                    val destination = journeyPlace(postcard.key.regionId)
-                    if (destination != null) {
-                        PostcardArtwork(destination, artwork("journey/postcards.png"), preview, Modifier.fillMaxWidth().height(210.dp),
-                            animate = state.session.reveal, companion = care.companion)
-                    } else if (postcard.source == RegionEvidenceSource.DEMO && preview != null) {
-                        CompanionPreviewPortrait(preview, Modifier.size(128.dp))
+                    if (card.careSummary.isNotEmpty()) {
+                        Text("이번 드라이브의 안내", style = MaterialTheme.typography.titleMedium)
+                        card.careSummary.forEach { summary ->
+                            Text(when (summary.rule) {
+                                RuleId.LIGHT -> "전조등 안내"; RuleId.HVAC -> "공조 제안"
+                                RuleId.REST -> "휴식 권장"; RuleId.WARNING -> "차량 경고"
+                            } + " · " + summary.occurrences + "회", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Text("안내가 발생한 기록이에요. 실제 행동을 수행했다는 뜻은 아니에요.", style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text(if (state.session.reveal) "새로운 기억을 발견했어요" else "함께 모은 엽서", style = MaterialTheme.typography.titleLarge)
-                    Text(postcard.regionLabel, style = MaterialTheme.typography.headlineMedium)
-                    Text(UiCopy.season(postcard.calendar.season) + "의 드라이브 · 컬렉션에 저장됨")
-                    if (openAlbum != null) TextButton(onClick = { openAlbum(destination) }) { Text("엽서 도감에서 열기") }
-                }
-            }
-            if (state.session.stage != PostDriveStage.COMPLETED) {
-                if (state.session.stage != PostDriveStage.REFLECTION_PENDING) {
-                    Button(onClick = { viewModel.postDriveAction { it.requestReflection(card.tripId) } },
-                        modifier = Modifier.heightIn(min = 60.dp)) {
-                        Text(if (card.reflection == null) "회고 남기기 · 선택" else "회고 수정")
+                    card.reflection?.let { reflection ->
+                        HorizontalDivider()
+                        Text("직접 남긴 이야기", style = MaterialTheme.typography.titleMedium)
+                        reflection.mood?.let { Text(UiCopy.mood(it)) }
+                        reflection.text?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                        Text(if (reflection.persistence == ReflectionPersistence.TRIP_LOCAL) "이 드라이브에 저장됨" else "현재 화면에서만 보기",
+                            style = MaterialTheme.typography.labelMedium)
                     }
                 }
-                if (state.session.stage == PostDriveStage.REFLECTION_PENDING) {
-                    ReflectionEditor(card, viewModel)
+                state.session.postcard?.let { postcard ->
+                    RoadmateCard {
+                        RoadmateBadge(if (postcard.source == RegionEvidenceSource.DEMO) "SIMULATED · 지역 엽서" else "지역 엽서")
+                        val destination = journeyPlace(postcard.key.regionId)
+                        if (destination != null) {
+                            PostcardArtwork(destination, artwork("journey/postcards.png"), preview, Modifier.fillMaxWidth().height(210.dp),
+                                animate = state.session.reveal, companion = care.companion)
+                        } else if (postcard.source == RegionEvidenceSource.DEMO && preview != null) {
+                            CompanionPreviewPortrait(preview, Modifier.size(128.dp))
+                        }
+                        Text(if (state.session.reveal) "새로운 기억을 발견했어요" else "함께 모은 엽서", style = MaterialTheme.typography.titleLarge)
+                        Text(postcard.regionLabel, style = MaterialTheme.typography.headlineMedium)
+                        Text(UiCopy.season(postcard.calendar.season) + "의 드라이브 · 컬렉션에 저장됨")
+                        if (openAlbum != null) TextButton(onClick = { openAlbum(destination) }) { Text("엽서 도감에서 열기") }
+                    }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    TextButton(onClick = { viewModel.postDriveAction { it.skip(card.tripId) } },
-                        modifier = Modifier.heightIn(min = 56.dp)) { Text("회고 건너뛰기") }
-                    Button(onClick = { focus.clearFocus(); keyboard?.hide(); viewModel.postDriveAction { it.complete(card.tripId) } },
-                        modifier = Modifier.heightIn(min = 60.dp)) { Text("드라이브 정리 완료") }
+                if (state.session.stage != PostDriveStage.COMPLETED) {
+                    if (state.session.stage != PostDriveStage.REFLECTION_PENDING) {
+                        Button(onClick = { viewModel.postDriveAction { it.requestReflection(card.tripId) } },
+                            modifier = Modifier.heightIn(min = 60.dp)) {
+                            Text(if (card.reflection == null) "회고 남기기 · 선택" else "회고 수정")
+                        }
+                    }
+                    if (state.session.stage == PostDriveStage.REFLECTION_PENDING) {
+                        ReflectionEditor(card, viewModel)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        TextButton(onClick = { viewModel.postDriveAction { it.skip(card.tripId) } },
+                            modifier = Modifier.heightIn(min = 56.dp)) { Text("회고 건너뛰기") }
+                        Button(onClick = { focus.clearFocus(); keyboard?.hide(); viewModel.postDriveAction { it.complete(card.tripId) } },
+                            modifier = Modifier.heightIn(min = 60.dp)) { Text("드라이브 정리 완료") }
+                    }
+                    Text("회고를 쓰지 않아도 드라이브 정리 보상은 같아요.", style = MaterialTheme.typography.bodyMedium)
+                } else Text("정리를 마친 기록이에요. 저장한 회고는 읽기 전용으로 볼 수 있어요.", style = MaterialTheme.typography.bodyMedium)
+                if (card.reflection?.persistence == ReflectionPersistence.TRIP_LOCAL) {
+                    OutlinedButton(enabled = state.memoryEnabled, onClick = { memoryConfirmation = card.reflection },
+                        modifier = Modifier.heightIn(min = 56.dp)) { Text("이 이야기를 별도 기억으로 저장") }
+                    Text(if (state.memoryEnabled) "회고 저장과 별개예요. 한 번 더 확인한 이야기만 기억해요."
+                        else "별도 기억을 원하면 설정에서 먼저 허용해 주세요.", style = MaterialTheme.typography.bodyMedium)
                 }
-                Text("회고를 쓰지 않아도 드라이브 정리 보상은 같아요.", style = MaterialTheme.typography.bodyMedium)
-            } else Text("정리를 마친 기록이에요. 저장한 회고는 읽기 전용으로 볼 수 있어요.", style = MaterialTheme.typography.bodyMedium)
-            if (card.reflection?.persistence == ReflectionPersistence.TRIP_LOCAL) {
-                OutlinedButton(enabled = state.memoryEnabled, onClick = { memoryConfirmation = card.reflection },
-                    modifier = Modifier.heightIn(min = 56.dp)) { Text("이 이야기를 별도 기억으로 저장") }
-                Text(if (state.memoryEnabled) "회고 저장과 별개예요. 한 번 더 확인한 이야기만 기억해요."
-                    else "별도 기억을 원하면 설정에서 먼저 허용해 주세요.", style = MaterialTheme.typography.bodyMedium)
             }
-        }
-        if (state.historyEnabled) {
-            val month = YearMonth.now(ZoneOffset.UTC)
-            val monthTrips = state.trips.filter { record ->
-                record.endedAtEpochMillis?.let { YearMonth.from(Instant.ofEpochMilli(it).atOffset(ZoneOffset.UTC)) } == month
-            }
-            val favorites = monthTrips.asReversed().filter { record ->
-                trip.storage.postDrive[record.tripId]?.reflection?.mood == ReflectionMood.GOOD
-            }.take(3)
-            RoadmateCard {
-                Text("우리의 이번 달", style = MaterialTheme.typography.titleLarge)
-                Text("${month.year}년 ${month.monthValue}월 · UTC", style = MaterialTheme.typography.labelMedium)
-                if (monthTrips.isEmpty()) {
-                    Text("이번 달에 저장된 드라이브가 아직 없어요.")
-                } else {
-                    if (favorites.isNotEmpty()) Text("좋았다고 남긴 드라이브")
+            if (state.historyEnabled) {
+                val month = YearMonth.now(ZoneOffset.UTC)
+                val monthTrips = state.trips.filter { record ->
+                    record.endedAtEpochMillis?.let { YearMonth.from(Instant.ofEpochMilli(it).atOffset(ZoneOffset.UTC)) } == month
+                }
+                val favorites = monthTrips.asReversed().filter { record ->
+                    trip.storage.postDrive[record.tripId]?.reflection?.mood == ReflectionMood.GOOD
+                }.take(3)
+                if (favorites.isNotEmpty()) RoadmateCard(compact = true) {
+                    Text("이번 달에 좋았던 드라이브", style = RoadmateType.cardTitle)
                     favorites.forEach { record ->
                         OutlinedButton(onClick = { viewModel.postDriveAction { it.open(record.tripId) } },
                             modifier = Modifier.heightIn(min = 56.dp)) { Text(UiCopy.date(record.startedAtEpochMillis)) }
                     }
-                    Text("저장한 드라이브 ${monthTrips.size}회 · 기록 시간 " + UiCopy.duration(monthTrips.sumOf { it.durationMillis }))
                 }
             }
-        }
-        Text("저장된 드라이브", style = MaterialTheme.typography.titleLarge)
-        if (state.trips.isEmpty()) RoadmateCard {
-            val emptyArt = artwork("journey/design/drive-empty.png")
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (emptyArt != null) Image(emptyArt, null, Modifier.size(82.dp))
-                else Text("✧", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.headlineLarge)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("아직 저장된 드라이브가 없어요.", style = MaterialTheme.typography.titleMedium)
-                    Text(if (state.historyEnabled) "드라이브가 완료되면 이곳에 모여요." else "기록 저장은 기본으로 꺼져 있어요. 설정에서 원할 때 켤 수 있어요.",
-                        style = MaterialTheme.typography.bodyMedium)
+            Text("저장된 드라이브", style = RoadmateType.cardTitle)
+            if (state.trips.isEmpty()) RoadmateCard {
+                val emptyArt = artwork("journey/design/drive-empty.png")
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (emptyArt != null) Image(emptyArt, null, Modifier.size(82.dp))
+                    else Text("✧", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.headlineLarge)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("아직 저장된 드라이브가 없어요.", style = MaterialTheme.typography.titleMedium)
+                        Text(if (state.historyEnabled) "드라이브가 완료되면 이곳에 모여요." else "기록 저장은 기본으로 꺼져 있어요. 설정에서 원할 때 켤 수 있어요.",
+                            style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
-        }
-        trip.runtime.completed?.takeIf { record -> state.trips.none { it.tripId == record.tripId } }?.let { record ->
-            OutlinedButton(onClick = { viewModel.postDriveAction { it.open(record.tripId) } },
-                modifier = Modifier.heightIn(min = 56.dp)) { Text("이번 드라이브 카드 열기 · 현재 세션만") }
-        }
-        state.trips.reversed().forEach { record ->
-            RoadmateCard {
-                Text(UiCopy.date(record.startedAtEpochMillis) + " · UTC", style = MaterialTheme.typography.titleMedium)
-                Text(UiCopy.duration(record.durationMillis) + "의 드라이브", style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Button(onClick = { viewModel.postDriveAction { it.open(record.tripId) } }, modifier = Modifier.heightIn(min = 56.dp)) { Text("기억 카드 열기") }
-                    TextButton(onClick = { deleteTarget = record.tripId }, modifier = Modifier.heightIn(min = 56.dp)) { Text("이 기록 삭제") }
+            trip.runtime.completed?.takeIf { record -> state.trips.none { it.tripId == record.tripId } }?.let { record ->
+                OutlinedButton(onClick = { viewModel.postDriveAction { it.open(record.tripId) } },
+                    modifier = Modifier.heightIn(min = 56.dp)) { Text("이번 드라이브 카드 열기 · 현재 세션만") }
+            }
+            state.trips.reversed().forEach { record ->
+                RoadmateCard {
+                    Text(UiCopy.date(record.startedAtEpochMillis) + " · UTC", style = MaterialTheme.typography.titleMedium)
+                    Text(UiCopy.duration(record.durationMillis) + "의 드라이브", style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Button(onClick = { viewModel.postDriveAction { it.open(record.tripId) } }, modifier = Modifier.heightIn(min = 56.dp)) { Text("기억 카드 열기") }
+                        TextButton(onClick = { deleteTarget = record.tripId }, modifier = Modifier.heightIn(min = 56.dp)) { Text("이 기록 삭제") }
+                    }
                 }
             }
-        }
+        })
     }
     deleteTarget?.let { id ->
         AlertDialog(onDismissRequest = { deleteTarget = null }, title = { Text("이 드라이브를 삭제할까요?") },
@@ -215,42 +209,44 @@ fun RecordSettingsContent(viewModel: RoadmateViewModel) {
     if (!state.contentAllowed) return
     var confirmation by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        RoadmateStoryHeader("나의 동행 설정", "차량 케어와 기록 저장", "home-parked.png", 3)
         StorageNotice(state.error)
-        ComfortSettingsContent(viewModel)
-        RoadmateCard {
-            Text("드라이브 기록", style = MaterialTheme.typography.titleLarge)
-            RoadmateBadge(if (state.historyEnabled) "저장 켜짐" else "저장 꺼짐")
-            Text("완료된 드라이브와 직접 저장한 회고를 보관해요. 끄면 저장된 기록·회고·연결된 기억을 지워요.",
-                style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = { if (state.historyEnabled) confirmation = "history-off" else
-                viewModel.postDriveAction { it.consent(ConsentScope.TRIP_HISTORY, true) } },
-                modifier = Modifier.heightIn(min = 60.dp)) { Text(if (state.historyEnabled) "드라이브 기록 저장 끄기" else "드라이브 기록 저장 켜기") }
-        }
-        RoadmateCard {
-            Text("별도 기억", style = MaterialTheme.typography.titleLarge)
-            RoadmateBadge(if (state.memoryEnabled) "허용됨" else "허용하지 않음")
-            Text("회고에서 한 번 더 확인한 이야기만 별도로 기억해요. 이 설정만 켜거나 회고를 저장했다고 자동으로 기억하지 않아요.",
-                style = MaterialTheme.typography.bodyMedium)
-            OutlinedButton(onClick = { if (state.memoryEnabled) confirmation = "memory-off" else
-                viewModel.postDriveAction { it.consent(ConsentScope.EMOTIONAL_MEMORY, true) } },
-                modifier = Modifier.heightIn(min = 56.dp)) { Text(if (state.memoryEnabled) "별도 기억 허용 끄기" else "별도 기억 허용 켜기") }
-        }
-        RoadmateCard {
-            Text("함께할 동반자", style = MaterialTheme.typography.titleLarge)
-            Text("현재 " + care.companion.displayName, style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                CompanionProfiles.all.forEach { profile ->
-                    FilterChip(selected = care.companion.id == profile.id, onClick = { viewModel.equipDefaultCompanion(profile.id) },
-                        label = { Text(profile.displayName) }, modifier = Modifier.heightIn(min = 56.dp))
-                }
+        RoadmateJournalColumns(first = { ComfortSettingsContent(viewModel) }, second = {
+            RoadmateCard {
+                Text("드라이브 기록", style = MaterialTheme.typography.titleLarge)
+                RoadmateBadge(if (state.historyEnabled) "저장 켜짐" else "저장 꺼짐")
+                Text("완료된 드라이브와 직접 저장한 회고를 보관해요. 끄면 저장된 기록·회고·연결된 기억을 지워요.",
+                    style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = { if (state.historyEnabled) confirmation = "history-off" else
+                    viewModel.postDriveAction { it.consent(ConsentScope.TRIP_HISTORY, true) } },
+                    modifier = Modifier.heightIn(min = 60.dp)) { Text(if (state.historyEnabled) "드라이브 기록 저장 끄기" else "드라이브 기록 저장 켜기") }
             }
-            Text("동반자가 바뀌어도 안전 안내와 우선순위는 같아요.",
-                style = MaterialTheme.typography.bodyMedium)
-        }
-        Text("현재 안내는 기능 설정을 위한 문안이에요. 최종 개인정보 안내는 검토 중이에요.", style = MaterialTheme.typography.bodyMedium)
-        OutlinedButton(enabled = state.trips.isNotEmpty(), onClick = { confirmation = "clear" },
-            modifier = Modifier.heightIn(min = 56.dp)) { Text("드라이브 기록 전체 삭제") }
+            RoadmateCard {
+                Text("별도 기억", style = MaterialTheme.typography.titleLarge)
+                RoadmateBadge(if (state.memoryEnabled) "허용됨" else "허용하지 않음")
+                Text("회고에서 한 번 더 확인한 이야기만 별도로 기억해요. 이 설정만 켜거나 회고를 저장했다고 자동으로 기억하지 않아요.",
+                    style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = { if (state.memoryEnabled) confirmation = "memory-off" else
+                    viewModel.postDriveAction { it.consent(ConsentScope.EMOTIONAL_MEMORY, true) } },
+                    modifier = Modifier.heightIn(min = 56.dp)) { Text(if (state.memoryEnabled) "별도 기억 허용 끄기" else "별도 기억 허용 켜기") }
+            }
+            RoadmateCard {
+                Text("함께할 동반자", style = MaterialTheme.typography.titleLarge)
+                Text("현재 " + care.companion.displayName, style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    CompanionProfiles.all.forEach { profile ->
+                        FilterChip(selected = care.companion.id == profile.id, onClick = { viewModel.equipDefaultCompanion(profile.id) },
+                            label = { Text(profile.displayName) }, modifier = Modifier.heightIn(min = 56.dp))
+                    }
+                }
+                Text("동반자가 바뀌어도 안전 안내와 우선순위는 같아요.",
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+            RoadmateCard(compact = true) {
+                Text("현재 안내는 기능 설정을 위한 문안이에요. 최종 개인정보 안내는 검토 중이에요.", style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(enabled = state.trips.isNotEmpty(), onClick = { confirmation = "clear" },
+                    modifier = Modifier.heightIn(min = 56.dp)) { Text("드라이브 기록 전체 삭제") }
+            }
+        })
     }
     confirmation?.let { action ->
         AlertDialog(onDismissRequest = { confirmation = null },
@@ -271,5 +267,7 @@ fun RecordSettingsContent(viewModel: RoadmateViewModel) {
 @Composable
 private fun StorageNotice(error: StorageError?) {
     if (error == null) return
-    Text(UiCopy.storageError(error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+    RoadmateCard(compact = true) {
+        Text(UiCopy.storageError(error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+    }
 }

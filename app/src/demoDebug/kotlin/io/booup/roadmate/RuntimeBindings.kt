@@ -1,6 +1,8 @@
 package io.booup.roadmate
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -8,7 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.booup.roadmate.context.VehicleContextStore
@@ -112,22 +114,21 @@ private fun DemoScenarioSelector(adapter: DemoVehicleAdapter, input: DemoLaunchI
     var group by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("케어") }
     var advanced by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(18.dp)) {
-        Text("함께 체험할 이야기", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-        RoadmateBadge("DEMO · SIMULATED", demo = true)
-        Text("모든 차량 값·지역·이용 상태는 시연용이에요. 실제 차량을 읽거나 제어하지 않아요.")
-        androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
             listOf("케어", "트립", "기억", "시즌").forEach { title ->
-                androidx.compose.material3.FilterChip(selected = group == title, onClick = { group = title },
-                    label = { Text(title) }, modifier = Modifier.heightIn(min = 56.dp))
+                GameButton(title, { group = title }, primary = group == title)
             }
         }
-        RoadmateCard(tinted = true) {
+        RoadmateCard(Modifier.widthIn(max = 780.dp)) {
             Text(when (group) {
                 "케어" -> "작은 변화를 알아차리는 케어"
                 "트립" -> "출발부터 정차 후까지"
                 "기억" -> "오늘의 드라이브를 한 장에"
                 else -> "안전한 습관을 꾸미는 시즌"
-            }, style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+            }, style = RoadmateType.heading)
+            Text("모든 차량 값·지역·이용 상태는 시연용이에요. 실제 차량을 읽거나 제어하지 않아요.",
+                style = RoadmateType.control)
             Text(if (group == "케어") "주행 시연으로 메뉴가 잠기면 ‘시뮬레이션 정차’를 눌러 다음 시연을 선택하세요."
                 else "선택하면 Demo 기록·컬렉션·시즌이 초기화되고 시연용 저장 동의를 사용해요. 실제 사용자 동의가 아니에요.")
             val choices = when (group) {
@@ -142,14 +143,11 @@ private fun DemoScenarioSelector(adapter: DemoVehicleAdapter, input: DemoLaunchI
                     "시연용 추가 보상" to "S10_SIMULATED_PREMIUM")
             }
             choices.forEach { (title, id) ->
-                androidx.compose.material3.OutlinedButton(onClick = { input.fromUi(id) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp)) { Text(title) }
+                GameButton(title, { input.fromUi(id) }, Modifier.fillMaxWidth())
             }
         }
-        TextButton(onClick = { advanced = !advanced }, modifier = Modifier.heightIn(min = 56.dp)) {
-            Text(if (advanced) "추가 시나리오 접기" else "검증용 시나리오 더 보기")
-        }
-        if (advanced) {
+        GameButton(if (advanced) "추가 시나리오 접기" else "검증용 시나리오 더 보기", { advanced = !advanced })
+        if (advanced) RoadmateCard {
             Text("검증용 선택 · 기존 시나리오 ID", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
             Text("현재 " + (careSelected?.name ?: interactionSelected?.name ?: selected?.name ?: "선택 대기"))
             DemoScenarios.all.forEach { scenario -> TextButton(onClick = { input.fromUi(scenario.id.name) }) { Text(scenario.title) } }

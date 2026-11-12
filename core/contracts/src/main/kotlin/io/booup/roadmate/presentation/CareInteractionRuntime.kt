@@ -163,7 +163,7 @@ class CareInteractionRuntime(
             else if (record.controlIntent?.action == CareAction.REQUEST_NAVIGATION)
                 "휴식 장소 요청을 받았어요. 실제 경로는 변경하지 않았어요."
             else "요청을 받았어요. 차량에서 직접 온도를 조절해 주세요. 앱은 변경하지 않았어요."
-        InteractionStage.REJECTED -> if (profile.tone == CompanionTone.WARM) "좋아요. 이번 제안은 건너뛸게요." else "이번 제안은 닫았어요."
+        InteractionStage.REJECTED -> if (profile.tone == CompanionTone.WARM) "알겠어요. 이번엔 넘어갈게요." else "이번 제안은 건너뛰었어요."
         InteractionStage.DISMISSED -> "안내를 닫았어요."
         InteractionStage.ACKNOWLEDGED -> if (record.event.priority == CarePriority.P1_SAFETY) null else "확인했어요."
         InteractionStage.EXPIRED -> "응답 시간이 지나 제안을 닫았어요."

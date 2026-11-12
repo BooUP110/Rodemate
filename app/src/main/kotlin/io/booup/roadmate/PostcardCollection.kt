@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.booup.roadmate.model.*
@@ -42,8 +43,8 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
     }
     LaunchedEffect(detail) { detail?.let { key -> game?.openCard(key.regionId) } }
     val collectedRegions = journeyRegionIds(owned.keys)
-    val slots = (journeyPlaces.filter { it.id !in collectedRegions }.map { it to null } +
-        state.collection.map { journeyPlace(it.key.regionId) to it }).filter { (_, card) ->
+    val slots = (state.collection.map { journeyPlace(it.key.regionId) to it } +
+        journeyPlaces.filter { it.id !in collectedRegions }.map { it to null }).filter { (_, card) ->
         when (filter) {
             AlbumFilter.ALL -> true
             AlbumFilter.OWNED -> card != null
@@ -51,69 +52,82 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
             AlbumFilter.SEASON -> card != null && (season == null || card.calendar.season == season)
         }
     }
-    RoadmateStoryHeader("엽서 컬렉션", "모은 엽서 ${state.collection.size}장", "drive-memory.png", 1)
-    RoadmateCard(tinted = true, compact = true) {
-        val covered = collectedRegions.size
-        LinearProgressIndicator(progress = { covered / journeyPlaces.size.toFloat() }, modifier = Modifier.fillMaxWidth().height(8.dp))
-        Text("여행 테마 엽서 $covered / ${journeyPlaces.size}장")
-    }
-    if (gameState != null) RoadmateCard {
-        val coast = coastalPlaces.count { it.id in collectedRegions }
-        val starredRegions = journeyRegionIds(owned.keys.filter { it.value in gameState.starredCards }.toSet())
-        val stars = starredRegions.size
-        Text("엽서 세트", style = MaterialTheme.typography.titleLarge)
-        Text("바닷길 앨범 $coast / ${coastalPlaces.size} · 강릉과 제주")
-        Text("별자리 페이지 $stars / ${journeyPlaces.size} · 엽서를 열어 별 붙이기")
-        if (stars > 0) Text(journeyPlaces.joinToString("    ") { if (it.id in starredRegions) "★" else "☆" })
-        if (coast == coastalPlaces.size) {
-            if ("coast-set" in gameState.claimed) RoadmateBadge("바닷길 세트 · 등대 소인 획득")
-            else OutlinedButton(onClick = { viewModel.journeyAction { claimSet() } }, modifier = Modifier.heightIn(min = 54.dp)) { Text("등대 소인 받기") }
-        }
-        if (stars == journeyPlaces.size) RoadmateBadge("별자리 페이지 완성 · 별빛 소인")
-        JourneyPass.entries.filter { rewardKey(it, 2, true) in gameState.claimed }.forEach { pass ->
-            OutlinedButton(onClick = { edition = pass }, modifier = Modifier.heightIn(min = 54.dp)) { Text("${pass.rewards[2]} 열기") }
+    Surface(shape = RoundedCornerShape(14.dp), color = GameInk.copy(alpha = .85f), contentColor = GamePaper) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("여행 테마 엽서 ${collectedRegions.size} / ${journeyPlaces.size}장", Modifier.weight(1f), style = RoadmateType.metric)
+                Text("모은 엽서 ${state.collection.size}장", color = GameGold, style = RoadmateType.metric)
+            }
+            LinearProgressIndicator(progress = { collectedRegions.size / journeyPlaces.size.toFloat() },
+                modifier = Modifier.fillMaxWidth().height(4.dp), color = GameGold, trackColor = GameMist.copy(alpha = .25f))
         }
     }
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        AlbumFilter.entries.forEach { item -> FilterChip(filter == item, { filter = item }, { Text(item.label) },
-            modifier = Modifier.heightIn(min = 54.dp)) }
-    }
-    if (filter == AlbumFilter.SEASON) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        (listOf(null) + CalendarSeason.entries).forEach { item ->
-            FilterChip(season == item, { season = item }, { Text(item?.let(UiCopy::season) ?: "모든 계절") },
-                modifier = Modifier.heightIn(min = 54.dp))
+    RoadmateJournalColumns(firstWeight = .69f, first = {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AlbumFilter.entries.forEach { item ->
+                GameButton(item.label, { filter = item }, primary = filter == item)
+            }
         }
-    }
-    if (slots.isEmpty()) RoadmateCard { Text("이 보기에는 아직 엽서가 없어요.") }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = when { maxWidth >= 1120.dp -> 4; maxWidth >= 640.dp -> 2; else -> 1 }
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            slots.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    row.forEach { (place, card) ->
-                        RoadmateCard(Modifier.weight(1f)) {
-                            if (card != null) {
-                                PostcardArtwork(place, art, tripMascot(card) ?: preview.takeIf { game == null },
-                                    Modifier.fillMaxWidth().height(132.dp), companion = care.companion.takeIf { game == null })
-                                Text(place?.title ?: card.regionLabel, style = MaterialTheme.typography.titleMedium)
-                                Text("${UiCopy.season(card.calendar.season)}의 기록 · 보유", style = MaterialTheme.typography.bodyMedium)
-                                OutlinedButton(onClick = { detail = card.key }, modifier = Modifier.heightIn(min = 54.dp)) { Text("엽서 펼치기") }
-                            } else {
-                                Box(Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(16.dp))
-                                    .background(Brush.verticalGradient(listOf(Color(0xFFE8EAF1), Color(0xFFD7DDE7)))),
-                                    contentAlignment = Alignment.Center) { Text("?", style = MaterialTheme.typography.headlineLarge) }
-                                Text(requireNotNull(place).name, style = MaterialTheme.typography.titleMedium)
-                                Text("미발견 · 첫 방문 기록으로 열려요.", style = MaterialTheme.typography.bodyMedium)
+        if (filter == AlbumFilter.SEASON) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            (listOf(null) + CalendarSeason.entries).forEach { item ->
+                GameButton(item?.let(UiCopy::season) ?: "모든 계절", { season = item }, primary = season == item)
+            }
+        }
+        if (slots.isEmpty()) RoadmateCard { Text("이 보기에는 아직 엽서가 없어요.") }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val columns = when { maxWidth >= 1120.dp -> 4; maxWidth >= 640.dp -> 2; else -> 1 }
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                slots.chunked(columns).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        row.forEach { (place, card) ->
+                            RoadmateCard(Modifier.weight(1f), compact = true) {
+                                if (card != null) {
+                                    PostcardArtwork(place, art, tripMascot(card) ?: preview.takeIf { game == null },
+                                        Modifier.fillMaxWidth().height(132.dp), companion = care.companion.takeIf { game == null })
+                                    Text(place?.title ?: card.regionLabel, style = RoadmateType.cardTitle)
+                                    Text("${UiCopy.season(card.calendar.season)}의 기록 · 보유", style = RoadmateType.metric)
+                                    GameButton("엽서 펼치기", { detail = card.key }, primary = true)
+                                } else {
+                                    val locked = requireNotNull(place)
+                                    Box(Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(16.dp))
+                                        .background(GameInk), contentAlignment = Alignment.Center) {
+                                        if (art != null) AtlasFrame(art, locked.art, Modifier.matchParentSize(), fill = true)
+                                        Box(Modifier.matchParentSize().background(Brush.verticalGradient(
+                                            listOf(GameInk.copy(alpha = .59f), GameInk.copy(alpha = .89f)))))
+                                        GamePill("미발견")
+                                    }
+                                    Text(locked.name, style = RoadmateType.cardTitle)
+                                    Text("첫 방문에 엽서가 열려요", style = RoadmateType.caption)
+                                }
                             }
                         }
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
-    }
-    OutlinedButton(onClick = { openMap(null) }, modifier = Modifier.heightIn(min = 56.dp)) { Text("탐험 지도 열기") }
+    }, second = {
+        if (gameState != null) RoadmateCard(compact = true) {
+            val coast = coastalPlaces.count { it.id in collectedRegions }
+            val starredRegions = journeyRegionIds(owned.keys.filter { it.value in gameState.starredCards }.toSet())
+            val stars = starredRegions.size
+            Text("엽서 세트", style = RoadmateType.cardTitle)
+            Text("바닷길 앨범 $coast / ${coastalPlaces.size} · 강릉과 제주", style = RoadmateType.control)
+            Text("별자리 페이지 $stars / ${journeyPlaces.size} · 엽서를 열어 별 붙이기", style = RoadmateType.control)
+            if (stars > 0) Text(journeyPlaces.joinToString("    ") { if (it.id in starredRegions) "★" else "☆" })
+            if (coast == coastalPlaces.size) {
+                if ("coast-set" in gameState.claimed) RoadmateBadge("바닷길 세트 · 등대 소인 획득")
+                else OutlinedButton(onClick = { viewModel.journeyAction { claimSet() } }, modifier = Modifier.heightIn(min = 54.dp)) { Text("등대 소인 받기") }
+            }
+            if (stars == journeyPlaces.size) RoadmateBadge("별자리 페이지 완성 · 별빛 소인")
+            JourneyPass.entries.filter { rewardKey(it, 2, true) in gameState.claimed }.forEach { pass ->
+                OutlinedButton(onClick = { edition = pass }, modifier = Modifier.heightIn(min = 54.dp)) { Text("${pass.rewards[2]} 열기") }
+            }
+        }
+        GameButton("탐험 지도 열기", { openMap(null) })
+    })
     owned.values.firstOrNull { it.key == detail }?.let { card ->
         val place = journeyPlace(card.key.regionId)
         val postcardCompanion = tripMascot(card)
@@ -129,7 +143,9 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
                     if (turn < 90f) PostcardArtwork(place, art, postcardCompanion ?: preview.takeIf { game == null },
                         Modifier.matchParentSize(), animate = true, companion = care.companion.takeIf { game == null })
                     else Box(Modifier.matchParentSize().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF6E5C5)),
-                        contentAlignment = Alignment.Center) { Text("ROAD MATE · 여행 소인", style = MaterialTheme.typography.titleMedium) }
+                        contentAlignment = Alignment.Center) {
+                        Text("${stringResource(R.string.app_name)} · 여행 소인", style = MaterialTheme.typography.titleMedium)
+                    }
                 }
                 Text(place?.note ?: "여행을 마치고 수집한 엽서")
                 Text("${UiCopy.season(card.calendar.season)} · ${UiCopy.date(card.acquiredAtEpochMillis)} UTC")
@@ -166,8 +182,9 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
 @Composable
 internal fun PostcardArtwork(place: JourneyPlace?, atlas: ImageBitmap?, preview: CompanionPreview?, modifier: Modifier,
     animate: Boolean = false, companion: CompanionProfile? = null) {
-    Box(modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFFDCEEE4))) {
+    Box(modifier.clip(RoundedCornerShape(16.dp)).background(GameInk)) {
         if (place != null && atlas != null) AtlasFrame(atlas, place.art, Modifier.matchParentSize(), fill = true)
+        else RoadmateLandscape("drive-memory.png", place?.art ?: 2, Modifier.matchParentSize(), atlas)
         if (preview != null) CompanionPreviewPortrait(preview, Modifier.align(Alignment.BottomEnd).size(102.dp), animate)
         else if (companion != null) OriginalCompanionPortrait(companion, Modifier.align(Alignment.BottomEnd).size(102.dp), animate)
     }

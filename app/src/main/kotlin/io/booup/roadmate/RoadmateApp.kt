@@ -20,14 +20,15 @@ import io.booup.roadmate.presentation.DrivingPresentationPolicy
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-private enum class RoadmatePage(val label: String, val symbol: String, val art: String) {
+private enum class RoadmatePage(val label: String, val symbol: String, val art: String,
+    val title: String = label, val artIndex: Int = 3) {
     HOME("동행", "⌂", "home-parked.png"),
-    MAP("탐험 지도", "◇", "map-gangneung.png"),
-    COLLECTION("엽서 컬렉션", "✉", "drive-memory.png"),
+    MAP("탐험 지도", "◇", "map-seoul.png", "안개 너머, 우리의 한국", 0),
+    COLLECTION("엽서 컬렉션", "✉", "map-gangneung.png", artIndex = 1),
     SEASON("시즌 패스", "✦", "map-gangneung.png"),
-    MEMORY("드라이브 기억", "↗", "drive-memory.png"),
-    SETTINGS("설정", "⚙", "home-parked.png"),
-    DEMO("시연 선택", "▷", "home-parked.png"),
+    MEMORY("드라이브 기억", "↗", "drive-memory.png", artIndex = 2),
+    SETTINGS("설정", "⚙", "home-parked.png", "나의 동행 설정"),
+    DEMO("시연 선택", "▷", "home-parked.png", "함께 체험할 이야기"),
 }
 
 /** Demo controls are supplied only by the variant composition root. */
@@ -48,6 +49,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
     var homeTrial by remember { mutableStateOf<CompanionPreview?>(null) }
     var returnToMap by remember { mutableStateOf(false) }
     var mapPlace by remember { mutableStateOf<JourneyPlace?>(null) }
+    var expedition by remember { mutableStateOf(Expedition.SEOUL) }
     var albumPlace by remember { mutableStateOf<JourneyPlace?>(null) }
     var storyOpen by rememberSaveable { mutableStateOf(false) }
     var storyBeat by rememberSaveable { mutableStateOf(MoonlightBeat.COVER) }
@@ -70,10 +72,15 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
     val canBrowse = full && post.contentAllowed
     val modeLabel = if (previews.isNotEmpty()) "내부 콜라보 시연"
         else simulationLabel ?: "실제 차량 정보 · 읽기 전용"
+    val showMap: (JourneyPlace?) -> Unit = { place ->
+        mapPlace = place
+        expedition = Expedition.containing(place?.id) ?: Expedition.SEOUL
+        page = RoadmatePage.MAP
+    }
     val navigate: (RoadmatePage) -> Unit = { target ->
         focus.clearFocus()
         keyboard?.hide()
-        if (target == RoadmatePage.MAP) mapPlace = null
+        if (target == RoadmatePage.MAP && (page != RoadmatePage.MAP || mapPlace != null)) showMap(null)
         if (target == RoadmatePage.COLLECTION) albumPlace = null
         page = target
     }
@@ -99,8 +106,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
     LaunchedEffect(journey.running, canBrowse, returnToMap) {
         if (returnToMap && !journey.running && canBrowse) {
             val visited = trip.storage.visits.filter { it.source == RegionEvidenceSource.DEMO }.map { it.regionId }.toSet()
-            mapPlace = if (journey.saved) Expedition.containing(journey.place?.id)?.next(visited) ?: journey.place else journey.place
-            page = RoadmatePage.MAP
+            showMap(if (journey.saved) Expedition.containing(journey.place?.id)?.next(visited) ?: journey.place else journey.place)
             returnToMap = false
         }
     }
@@ -123,7 +129,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
                 } ?: 0L
                 MoonlightEpisode(storyChapter, storyBeat, care.companion, viewModel, gameState,
                     storyVisit || storyAction, storySaveFailed, earned,
-                    modifier = Modifier.fillMaxSize().padding(insets), close = { storyOpen = false },
+                    modifier = Modifier.fillMaxSize(), insets = insets, close = { storyOpen = false },
                     advance = { next ->
                         storySaveFailed = false
                         if (next == MoonlightBeat.PUZZLE && !recorded) {
@@ -160,7 +166,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
                     CompanionProfiles.all + owned.map { it.profile }, modeLabel,
                     UiCopy.trip(trip.runtime.state, trip.runtime.recoveryRequired), post.collection.size,
                     progress.active?.progress?.totalXp, openStory.takeIf { canPlayStory && !journey.running },
-                    openMap = { mapPlace = journey.place.takeIf { journey.saved }; page = RoadmatePage.MAP },
+                    openMap = { showMap(journey.place.takeIf { journey.saved }) },
                     selectCompanion = { id ->
                         homeTrial = null
                         if (gameState == null) viewModel.selectCompanion(id)
@@ -198,35 +204,40 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
                     openStory.takeIf { canPlayStory && !journey.running }, insets, { navigate(RoadmatePage.HOME) }, priorityCare)
                 return@Scaffold
             }
+            if (canBrowse) {
+                val art = if (page == RoadmatePage.MAP) "map-${expedition.asset}.png" else page.art
+                val artIndex = if (page == RoadmatePage.MAP) expedition.postcardIndex else page.artIndex
+                key(page) {
+                    RoadmateChapter(page.title, art, artIndex, modeLabel, insets, navigation, priorityCare) {
+                        when (page) {
+                            RoadmatePage.DEMO -> demoControls?.invoke()
+                            RoadmatePage.MEMORY -> PostDriveContent(viewModel,
+                                openAlbum = { albumPlace = it; page = RoadmatePage.COLLECTION },
+                                openMap = showMap,
+                                openSeason = { page = RoadmatePage.SEASON }, showHeader = false)
+                            RoadmatePage.MAP -> ExplorationContent(viewModel, context,
+                                initialPlace = mapPlace, route = expedition, onRouteChange = { expedition = it },
+                                openCollection = { albumPlace = it; page = RoadmatePage.COLLECTION },
+                                openMemory = { page = RoadmatePage.MEMORY }, openSeason = { page = RoadmatePage.SEASON },
+                                onSimulate = { place -> viewModel.simulateVisit(place); returnToMap = true })
+                            RoadmatePage.COLLECTION -> CollectionContent(viewModel, activePreview, albumPlace, showMap)
+                            RoadmatePage.SETTINGS -> RecordSettingsContent(viewModel)
+                            RoadmatePage.HOME, RoadmatePage.SEASON -> Unit
+                        }
+                    }
+                }
+                return@Scaffold
+            }
             Box(Modifier.fillMaxSize().padding(insets)) {
-                if (canBrowse) RoadmateWallpaper(page.art, Modifier.matchParentSize())
                 Column(Modifier.fillMaxSize().imePadding().padding(horizontal = 20.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RoadmateMasthead(modeLabel, decorated = full)
                     priorityCare()
                     key(page, canBrowse, full) {
                         val scroll = rememberScrollState()
-                        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(bottom = 24.dp),
-                            verticalArrangement = Arrangement.spacedBy(if (page == RoadmatePage.MAP) 11.dp else 20.dp)) {
-                            if (canBrowse && page == RoadmatePage.COLLECTION) {
-                                Text("정차 상태 · ${UiCopy.connection(context.connection.status)}", style = MaterialTheme.typography.labelMedium)
-                            }
+                        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(bottom = 24.dp)) {
                             when {
                                 page == RoadmatePage.DEMO && full && demoControls != null -> demoControls()
-                                page == RoadmatePage.MEMORY && canBrowse -> PostDriveContent(viewModel,
-                                    openAlbum = { albumPlace = it; page = RoadmatePage.COLLECTION },
-                                    openMap = { mapPlace = it; page = RoadmatePage.MAP }, openSeason = { page = RoadmatePage.SEASON })
-                                page == RoadmatePage.MAP && canBrowse -> ExplorationContent(viewModel, context,
-                                    initialPlace = mapPlace,
-                                    openCollection = { albumPlace = it; page = RoadmatePage.COLLECTION },
-                                    openMemory = { page = RoadmatePage.MEMORY }, openSeason = { page = RoadmatePage.SEASON }, onSimulate = { place ->
-                                        viewModel.simulateVisit(place)
-                                        returnToMap = true
-                                    })
-                                page == RoadmatePage.COLLECTION && canBrowse -> CollectionContent(viewModel, activePreview, albumPlace) {
-                                    mapPlace = it; page = RoadmatePage.MAP
-                                }
-                                page == RoadmatePage.SETTINGS && canBrowse -> RecordSettingsContent(viewModel)
                                 !full -> RoadmateCard {
                                     Text(UiCopy.connection(context.connection.status), style = MaterialTheme.typography.titleMedium)
                                     Text(UiCopy.trip(trip.runtime.state, trip.runtime.recoveryRequired), style = MaterialTheme.typography.headlineMedium)
@@ -250,7 +261,7 @@ fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? = null,
                             }
                         }
                     }
-                    if (canBrowse || (full && demoControls != null)) navigation()
+                    if (full && demoControls != null) navigation()
                 }
             }
         }

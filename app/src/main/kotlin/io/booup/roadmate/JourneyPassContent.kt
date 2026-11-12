@@ -71,13 +71,14 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
     }
     BackHandler { goBack() }
 
-    Box(modifier) {
+    BoxWithConstraints(modifier) {
+        val margin = if (maxWidth >= 730.dp) 24.dp else 16.dp
         WorldBackdrop(world, Modifier.matchParentSize())
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(
             .0f to world.deep.copy(alpha = .93f), .20f to world.deep.copy(alpha = .48f),
             .45f to Color.Transparent, .74f to world.deep.copy(alpha = .09f), 1f to world.deep.copy(alpha = .68f),
         )))
-        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = margin)) {
             Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = ::goBack, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(if (page == PassPage.LOBBY) "‹  동행" else "‹  뒤로", color = Color.White,
@@ -306,7 +307,7 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     choices.forEach { mascot ->
-                        WorldAction(if (claimed) "${mascot.profile.displayName} 로드메이트로 지정" else "${mascot.profile.displayName} 받기", world, {
+                        WorldAction(if (claimed) "${mascot.profile.displayName} 동행으로 지정" else "${mascot.profile.displayName} 받기", world, {
                             if (claimed) viewModel.equipJourneyCompanion(mascot.profile.id, openHome)
                             else viewModel.journeyAction { game.claim(pass, 3, true, mascot.profile.id) }
                         })
@@ -461,7 +462,7 @@ private fun PassLibrary(viewModel: RoadmateViewModel, data: JourneyGameState, ar
             val mascot = viewModel.companionPreviews.firstOrNull { it.profile.id == id }
             if (mascot != null) {
                 Text(mascot.profile.displayName, color = world.deep, fontWeight = FontWeight.Bold)
-                WorldAction(if (data.equipped == id) "동행 홈에서 보기" else "로드메이트로 지정", world,
+                WorldAction(if (data.equipped == id) "동행 홈에서 보기" else "동행으로 지정", world,
                     { viewModel.equipJourneyCompanion(id, openHome) }, primary = false)
                 viewModel.journeyGame?.visibleMemories(data)?.firstOrNull { it.companion == id }?.let { memory ->
                     val place = Expedition.entries.flatMap { listOf(it.region) + it.places }.firstOrNull { it.name == memory.region }
@@ -475,8 +476,8 @@ private fun PassLibrary(viewModel: RoadmateViewModel, data: JourneyGameState, ar
 }
 
 private fun journeyMemoryLine(companion: String, place: String) = when (companion) {
-    "preview:usagi" -> "우라! $place, 한 장 더 간직했어요!"
-    "preview:starlight" -> "${place}에서 반짝인 순간을 별 하나로 남겼어요."
-    "preview:waveotter" -> "${place}에 함께 갔던 날을 조개처럼 소중히 간직할래요."
-    else -> "${place}에 함께 갔던 날을 엽서에 남겼어요."
+    "preview:usagi" -> "우라! ${place}에서 찍은 풍경도 엽서에 담았어요!"
+    "preview:starlight" -> "${place}에서 본 별이 참 예뻤어요. 엽서에도 그려 뒀어요."
+    "preview:waveotter" -> "${place}에 같이 갔던 날이 생각나요. 조개 옆에 이 엽서도 둘래요."
+    else -> "${place}에 같이 갔던 날을 엽서에 담았어요."
 }

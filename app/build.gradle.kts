@@ -60,6 +60,7 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
     sourceSets.getByName("test").java.srcDir("../core/contracts/src/testSupport/kotlin")
+    sourceSets.getByName("debug").res.srcDir(rootProject.file("development/local-fonts/res"))
     if (internalCollabs) {
         val preview = rootProject.file("development/collab-preview")
         sourceSets.maybeCreate("demoDebug").apply {

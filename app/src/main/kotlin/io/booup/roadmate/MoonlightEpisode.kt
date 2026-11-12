@@ -2,10 +2,6 @@ package io.booup.roadmate
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -51,7 +47,7 @@ private val MoonlightCream = Color(0xFFFFF2D9)
 @Composable
 internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, companion: CompanionProfile,
     viewModel: RoadmateViewModel, state: JourneyGameState,
-    saving: Boolean, failed: Boolean, earnedXp: Long, modifier: Modifier, close: () -> Unit,
+    saving: Boolean, failed: Boolean, earnedXp: Long, modifier: Modifier, insets: PaddingValues, close: () -> Unit,
     advance: (MoonlightBeat) -> Unit, beginFromStart: () -> Unit, solve: (Int) -> Unit,
     nextChapter: () -> Unit, openAlbum: () -> Unit,
     priorityCare: @Composable () -> Unit) {
@@ -77,7 +73,7 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
         val sceneHeight = maxHeight
         val art = if (isCover || beat == MoonlightBeat.TRAVEL) "map-gangneung.png" else chapter.art
         val camera = remember(art) { Animatable(0f) }
-        LaunchedEffect(art) { camera.animateTo(1f, tween(1800, easing = FastOutSlowInEasing)) }
+        LaunchedEffect(art) { camera.animateTo(1f, tween(3600, easing = FastOutSlowInEasing)) }
         val cameraPosition = camera.asState()
         MoonlightBackground(art, cameraPosition, atlas)
         MoonlightDepth(art, "mid", cameraPosition)
@@ -106,7 +102,7 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
             val resident = guest.takeIf { beat == MoonlightBeat.CLUE }
             val residentScene = beat == MoonlightBeat.CLUE
             val actor = if (residentScene) resident?.profile ?: CompanionProfiles.all.first { it.id != companion.id } else companion
-            key(chapter, beat) { MoonlightActor(actor, if (residentScene) resident else player,
+            key(chapter, actor.id) { MoonlightActor(actor, if (residentScene) resident else player,
                 outfit.takeUnless { residentScene }, pose) }
             if (residentScene && wide) {
                 val listener = Modifier.align(BiasAlignment(.04f, .07f)).size(minOf(maxWidth * .22f, maxHeight * .36f))
@@ -120,23 +116,21 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
                 .width(postcardWidth), atlas)
         }
 
-        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = margin, vertical = 14.dp),
+        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(insets)
+            .padding(horizontal = margin, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilledTonalButton(close, enabled = !saving, modifier = Modifier.heightIn(min = 50.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = MoonlightInk, contentColor = Color.White)) {
-                    Text("← 나가기")
-                }
+                GameButton("‹ 나가기", close, enabled = !saving)
                 Text(if (isCover) "강릉" else chapter.place.name, Modifier.weight(1f), color = Color.White,
-                    style = MaterialTheme.typography.titleMedium)
-                if (wide && !isCover) Text(chapter.title, color = MoonlightCream, style = MaterialTheme.typography.labelMedium)
+                    style = RoadmateType.cardTitle)
+                if (wide && !isCover) GamePill(chapter.title)
             }
             priorityCare()
         }
 
         val panelWidth = if (wide && beat != MoonlightBeat.PUZZLE) maxWidth * .57f else maxWidth
-        Column(Modifier.align(Alignment.BottomStart).width(panelWidth).heightIn(max = sceneHeight * .73f)
+        Column(Modifier.align(Alignment.BottomStart).width(panelWidth).heightIn(max = sceneHeight * .73f).padding(insets)
             .padding(horizontal = margin, vertical = if (wide) 26.dp else 12.dp).verticalScroll(rememberScrollState())
             .background(MoonlightInk.copy(alpha = .92f), RoundedCornerShape(26.dp)).padding(if (wide) 22.dp else 15.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -147,8 +141,8 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
                     Text("사라진 달빛 엽서", color = Color.White,
                         style = RoadmateType.heading.copy(fontSize = if (wide) 49.sp else 35.sp,
                             lineHeight = if (wide) 58.sp else 42.sp))
-                    Text(if (state.moonlightCompleted == 0) "엽서에서 달이 사라진 날, 강릉으로 향합니다."
-                        else "엽서 조각 ${state.moonlightCompleted} / ${MoonlightChapter.entries.size}",
+                    Text(if (state.moonlightCompleted == 0) "그림이 사라진 엽서 한 장. 오죽헌에서 첫 단서를 찾아요."
+                        else "모은 엽서 조각 ${state.moonlightCompleted} / ${MoonlightChapter.entries.size}",
                         color = MoonlightCream, style = MaterialTheme.typography.bodyMedium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         MoonlightButton(when { finished -> "완주 다시 보기"; state.moonlightCompleted > 0 -> "이어 하기"; else -> "이야기 시작" }) {
@@ -172,7 +166,7 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
                     MoonlightButton("도착 시연") { advance(MoonlightBeat.ARRIVAL) }
                 }
                 MoonlightBeat.ARRIVAL -> {
-                    MoonlightDialogue(speaker, "${chapter.place.name}에 도착했어! 여기서 엽서에 들어갈 그림을 찾아보자.")
+                    MoonlightDialogue(speaker, chapter.arrival)
                     MoonlightButton("현장 이야기 듣기") { advance(MoonlightBeat.CLUE) }
                 }
                 MoonlightBeat.MISSION -> {
@@ -182,7 +176,10 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
                     }
                 }
                 MoonlightBeat.PUZZLE -> {
-                    MoonlightDialogue("현장 인증 완료 · 엽서의 빈칸", if (wrongAnswer) chapter.clue else chapter.puzzle)
+                    MoonlightDialogue(
+                        if (wrongAnswer) guest?.profile?.displayName ?: chapter.resident else "엽서의 빈칸",
+                        if (wrongAnswer) chapter.clue else chapter.puzzle,
+                    )
                     val choose: (Int) -> Unit = { index ->
                         wrongAnswer = index != chapter.answer
                         if (!wrongAnswer) solve(index)
@@ -219,32 +216,25 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
 
 @Composable
 private fun MoonlightDialogue(speaker: String, line: String) {
-    Text(speaker, color = MoonlightGold, style = MaterialTheme.typography.labelLarge)
-    Text(line, color = Color.White, style = MaterialTheme.typography.bodyLarge)
+    Text(speaker, color = MoonlightGold, style = RoadmateType.control)
+    Text(line, color = GamePaper, style = MaterialTheme.typography.bodyMedium)
 }
 
 @Composable
 private fun MoonlightButton(label: String, enabled: Boolean = true, action: () -> Unit) {
-    Button(action, Modifier.heightIn(min = 58.dp), enabled = enabled,
-        colors = ButtonDefaults.buttonColors(containerColor = MoonlightGold, contentColor = MoonlightInk,
-            disabledContainerColor = MoonlightCream, disabledContentColor = MoonlightInk)) {
-        Text(label, style = MaterialTheme.typography.labelLarge)
-    }
+    GameButton(label, action, Modifier.heightIn(min = 54.dp), primary = true, enabled = enabled)
 }
 
 @Composable
 private fun MoonlightActor(companion: CompanionProfile, preview: CompanionPreview?, outfit: MoonlightOutfit?, modifier: Modifier) {
-    val arrival = remember { Animatable(-1f) }
-    LaunchedEffect(Unit) { arrival.animateTo(0f, tween(1000, easing = FastOutSlowInEasing)) }
-    val idle by rememberInfiniteTransition(label = "companion").animateFloat(initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(720), RepeatMode.Reverse), label = "bounce")
+    val arrival = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { arrival.animateTo(1f, tween(1450, easing = FastOutSlowInEasing)) }
     val motion = modifier.graphicsLayer {
-        translationX = size.width * arrival.value * .8f
-        translationY = -idle * 7.dp.toPx()
-        rotationZ = idle * 3f - 1.5f
+        alpha = .75f + arrival.value * .25f
+        translationX = (arrival.value - 1f) * 16.dp.toPx()
     }
     Box(motion, contentAlignment = Alignment.Center) {
-        if (preview != null) CompanionPreviewPortrait(preview, Modifier.fillMaxSize(), roam = outfit == null)
+        if (preview != null) CompanionPreviewPortrait(preview, Modifier.fillMaxSize())
         else OriginalCompanionPortrait(companion, Modifier.fillMaxSize())
         if (outfit != null) Canvas(Modifier.matchParentSize()) {
             val (color, top) = when (outfit) {

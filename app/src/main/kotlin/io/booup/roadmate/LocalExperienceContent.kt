@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ComfortSettingsContent(viewModel:RoadmateViewModel) {
     val state by viewModel.comfortUiState.collectAsStateWithLifecycle()
@@ -17,7 +18,7 @@ fun ComfortSettingsContent(viewModel:RoadmateViewModel) {
         Text("정차 중 온도 안내",style=MaterialTheme.typography.titleLarge)
         Text("이 기기에 저장한 선호를 사용해요. 자동으로 학습하거나 차량 설정을 바꾸지 않아요.")
         Text(state.preference?.let { "저장한 선호  "+UiCopy.temperature(it.valueCelsius) } ?: "저장한 선호가 없어요.")
-        Row(horizontalArrangement=Arrangement.spacedBy(18.dp)) {
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(10.dp), verticalArrangement=Arrangement.spacedBy(4.dp)) {
             OutlinedButton(enabled=draft>16,onClick={draft=(draft-.5).coerceAtLeast(16.0)},modifier=Modifier.heightIn(min=56.dp)) { Text("선호 낮추기") }
             Text(UiCopy.temperature(draft),modifier=Modifier.padding(top=18.dp))
             OutlinedButton(enabled=draft<30,onClick={draft=(draft+.5).coerceAtMost(30.0)},modifier=Modifier.heightIn(min=56.dp)) { Text("선호 높이기") }

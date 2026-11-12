@@ -2,6 +2,7 @@ package io.booup.roadmate
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -44,6 +45,11 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
+
+private const val NEUTRAL_POSE = 0
+private const val WAVE_POSE = 1
+private const val SMILE_POSE = 2
+private const val BLINK_POSE = 3
 
 data class CompanionPreview(val profile: CompanionProfile, val portrait: String, val seasonTitle: String,
     val idleAtlas: String? = null)
@@ -88,13 +94,15 @@ private fun CompanionArtwork(portrait: String, idleAtlas: String?, description: 
     if (atlas != null && animate && roam) {
         RoamingCompanionPortrait(atlas, description, modifier)
     } else if (atlas != null) {
-        var frame by remember(atlas) { mutableIntStateOf(0) }
+        var frame by remember(atlas) { mutableIntStateOf(NEUTRAL_POSE) }
         LaunchedEffect(atlas, animate) {
-            frame = 0
+            frame = NEUTRAL_POSE
             if (!animate) return@LaunchedEffect
             while (true) {
-                delay(1_350)
-                for (next in listOf(1, 2, 3, 0)) { frame = next; delay(if (next == 2) 180 else 145) }
+                delay(4_800)
+                frame = BLINK_POSE
+                delay(240)
+                frame = NEUTRAL_POSE
             }
         }
         AtlasFrame(atlas, frame, modifier.semantics { contentDescription = description })
@@ -106,39 +114,35 @@ private fun CompanionArtwork(portrait: String, idleAtlas: String?, description: 
 private fun RoamingCompanionPortrait(atlas: ImageBitmap, description: String, modifier: Modifier) {
     val position = remember { Animatable(0f) }
     var bounce by remember { mutableFloatStateOf(0f) }
-    var tilt by remember { mutableFloatStateOf(0f) }
-    var frame by remember { mutableIntStateOf(0) }
+    var frame by remember { mutableIntStateOf(NEUTRAL_POSE) }
     var greetings by remember { mutableIntStateOf(0) }
     LaunchedEffect(greetings) {
         suspend fun wave() {
-            for (next in listOf(1, 2, 3, 0)) {
-                frame = next
-                delay(if (next == 2) 220 else 150)
-            }
+            frame = WAVE_POSE
+            delay(720)
+            frame = SMILE_POSE
+            delay(850)
+            frame = NEUTRAL_POSE
         }
 
         bounce = 0f
-        tilt = 0f
-        frame = 0
+        frame = NEUTRAL_POSE
         if (greetings > 0) wave()
-        delay(950)
+        delay(1_800)
         while (true) {
-            for (target in listOf(.85f, -.85f, 0f)) {
+            for (target in listOf(.82f, -.82f, 0f)) {
                 val start = position.value
                 val distance = abs(target - start)
                 if (distance > .03f) {
-                    val steps = if (distance > 1f) 4 else 2
-                    position.animateTo(target, tween(steps * 310)) {
+                    val steps = if (distance > 1f) 5 else 3
+                    position.animateTo(target, tween((3_000 * distance).roundToInt(), easing = LinearEasing)) {
                         val phase = (value - start) / (target - start) * steps * PI
                         bounce = abs(sin(phase)).toFloat()
-                        tilt = (sin(phase) * 3f).toFloat()
-                        frame = if (bounce > .6f) 1 else 0
                     }
                 }
                 bounce = 0f
-                tilt = 0f
-                wave()
-                delay(450)
+                if (target == 0f) wave()
+                delay(1_650)
             }
         }
     }
@@ -148,15 +152,14 @@ private fun RoamingCompanionPortrait(atlas: ImageBitmap, description: String, mo
         val sprite = minOf(maxWidth, maxHeight * .84f)
         val stride = ((maxWidth - sprite) / 2).coerceAtMost(72.dp)
         Canvas(Modifier.matchParentSize()) {
-            val width = sprite.toPx() * (.48f - bounce * .06f)
+            val width = sprite.toPx() * (.48f - bounce * .02f)
             val height = sprite.toPx() * .06f
             drawOval(Color(0x263F6551), Offset(center.x + position.value * stride.toPx() - width / 2,
                 center.y + sprite.toPx() * .37f), Size(width, height))
         }
         AtlasFrame(atlas, frame, Modifier.size(sprite).graphicsLayer {
             translationX = position.value * stride.toPx()
-            translationY = -bounce * 10.dp.toPx()
-            rotationZ = tilt
+            translationY = -bounce * 2.5.dp.toPx()
         })
     }
 }

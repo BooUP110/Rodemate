@@ -50,11 +50,12 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
     }
     val atlas = artwork("journey/postcards.png")
 
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val margin = if (maxWidth >= 680.dp) 22.dp else 14.dp
         RoadmateLandscape("map-gangneung.png", 1, Modifier.matchParentSize(), atlas)
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(
             0f to GameInk, .5f to GameInk.copy(alpha = .65f), 1f to GameInk)))
-        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 14.dp),
+        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = margin),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -206,13 +207,13 @@ private fun RewardDialog(item: RewardView, preview: CompanionPreview?, viewModel
                     Modifier.fillMaxWidth().height(142.dp), animate = true)
             }
             Text("레벨 ${item.reward.level} · ${rewardLabel(item.state)}")
-            Text(if (pack != null) "팩을 받으면 로드메이트로 직접 지정할 수 있어요." else "시즌에서 받은 꾸미기 보상으로 기록돼요.")
+            Text(if (pack != null) "팩을 받으면 이 캐릭터를 동행으로 선택할 수 있어요." else "시즌에서 받은 꾸미기 보상으로 기록돼요.")
         }
     }, confirmButton = {
         if (item.state == RewardClaimState.CLAIMED && pack != null) TextButton(onClick = {
             dismiss()
             viewModel.selectCompanion(pack.companionProfileId)
-        }) { Text("로드메이트로 지정") }
+        }) { Text("동행으로 지정") }
         else if (item.state == RewardClaimState.AVAILABLE) TextButton(onClick = {
             dismiss()
             claim()

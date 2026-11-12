@@ -82,7 +82,7 @@ Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형�
 
 ### 내부 콜라보 미리보기
 
-로컬 `development/collab-preview/assets/companion-previews/`에 `catalog.json`과 각 초상화를 둔다. 카탈로그는 `id`, `name`, `seasonTitle`과 선택 항목 `tone`(`WARM` 또는 `CALM`)을 담은 객체 배열이다. `<id>.png` 또는 `<id>-idle.png`를 사용한다. 동작 파일의 2×2 칸은 왼쪽 위부터 오른쪽 아래 순으로 재생한다. 내부 시연 앱 이름은 로컬 `development/collab-preview/res/values/strings.xml`의 `app_name`으로 지정할 수 있다.
+로컬 `development/collab-preview/assets/companion-previews/`에 `catalog.json`과 각 초상화를 둔다. 카탈로그는 `id`, `name`, `seasonTitle`과 선택 항목 `tone`(`WARM` 또는 `CALM`)을 담은 객체 배열이다. `<id>.png` 또는 `<id>-idle.png`를 사용한다. 동작 파일의 2×2 칸은 왼쪽 위부터 오른쪽 아래 순으로 읽는다. 두 빌드의 앱 이름은 `app/src/main/res/values/strings.xml`의 `app_name`을 사용한다.
 
 시즌 화면의 일러스트는 로컬 `development/collab-preview/assets/pass-worlds/`에 `travel.jpg`, `stars.jpg`, `coast.jpg`, `post.jpg`로 둔다. 해당 이미지가 없는 빌드는 테마별 그라데이션 배경을 사용한다.
 
@@ -92,7 +92,7 @@ Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형�
 
 내부 APK는 `development/collab-preview/apk/roadmate-collab-debug.apk`에 복사되고 앱 ID는 `io.booup.roadmate.demo.collab`이다. 로컬 `development/`는 Git 제외 경로다. 내부 이미지가 담긴 APK는 가상 콜라보 시연용으로 관리한다.
 
-Android Studio에서 `C:/Users/scspr/WorkSpace/Rodemate`를 프로젝트로 열고 `demoDebug`로 기본 Run을 누르면 `AI 로드메이트`(`io.booup.roadmate.demo`)가 실행된다. 정차 시 동행 홈 전체에 풍경과 캐릭터가 펼쳐진다. `차량 상태`에서 차량 정보를 열고, `강릉 이야기`에서 오리지널 동행과 함께 장소별 일러스트를 본다. 하단의 `시즌 패스`에서 보상과 무료·프리미엄 진행도를 확인한다. `roadmateInternalCollabs`를 지정한 빌드는 치이카와 등 로컬 시연 캐릭터와 콜라보 시즌 화면을 추가하고 `AI 로드메이트 (콜라보 시연)`으로 설치한다. 두 앱은 각각의 저장 데이터를 사용한다.
+Android Studio에서 `C:/Users/scspr/WorkSpace/Rodemate`를 프로젝트로 열고 `demoDebug`로 기본 Run을 누르면 **카펫**(`io.booup.roadmate.demo`)이 실행된다. 정차 시 동행 홈 전체에 풍경과 캐릭터가 펼쳐진다. `차량 상태`에서 차량 정보를 열고, `강릉 이야기`에서 오리지널 동행과 함께 장소별 일러스트를 본다. 하단의 `시즌 패스`에서 보상과 무료·프리미엄 진행도를 확인한다. `roadmateInternalCollabs`를 지정한 빌드도 **카펫**(`io.booup.roadmate.demo.collab`)으로 표시되며 홈에 `내부 콜라보 시연` 배지가 붙는다. 이 빌드는 로컬 시연 캐릭터와 콜라보 시즌 화면을 포함한다. 두 앱은 각각의 저장 데이터를 사용한다.
 
 콜라보 캐릭터와 함께 플레이하려면 에뮬레이터를 켜고 위에서 만든 내부 APK를 에뮬레이터 화면에 끌어다 놓는다. 프로젝트에서 바로 빌드하고 설치하려면 Android Studio 터미널에서 다음 명령을 실행한다.
 
@@ -100,14 +100,14 @@ Android Studio에서 `C:/Users/scspr/WorkSpace/Rodemate`를 프로젝트로 열�
 .\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:mergeDemoDebugAssets --rerun :app:installDemoDebug
 ~~~
 
-설치 후 앱 목록에서 `AI 로드메이트 (콜라보 시연)`을 열고 `강릉 이야기 → 이야기 시작`을 선택한다. 이미 완주한 경우 `처음부터`를 선택한다.
+설치 후 **카펫**을 열고 홈의 `내부 콜라보 시연` 배지를 확인한다. `강릉 이야기 → 이야기 시작`을 선택한다. 이미 완주한 경우 `처음부터`를 선택한다.
 
 ### 탐험 지도와 엽서 시연
 
 1. **탐험 지도 → 서울·강릉·경주·제주 → 다음 목표 → 방문 시연**으로 합성 트립을 재생한다. 정차하면 해당 지점의 엽서가 열리고 다음 원형 포인트가 공개된다. 주행과 첫 방문 XP는 같은 시즌 원장에 쌓인다.
 2. **여행 엽서 펼치기 → 별 스탬프 붙이기**로 미션 보드 첫 줄을 완성한다. **시즌 패스 → 미션 보드**에서 미보유 패스권 한 종을 선택한다.
 3. **시즌 패스**에서 일러스트 포스터를 눌러 해당 패스에 들어간다. 하단 패스 트랙의 보상 칸을 누르면 상세와 수령 상태가 열린다. **패스권 뽑기**에서 무료 시연권으로 미보유 패스를 뽑고 봉투를 연다. 강릉과 제주 엽서를 모으면 두 번째 시연권이 열린다.
-4. 보유한 프리미엄 패스에서 시즌 Lv.5를 달성하면 **Lv.5 완주 동반자 팩 → 동반자 팩 열기 → 받기 → 로드메이트로 지정**을 누른다. 다시 방문 시연을 하면 **내 패스함**에 동반자의 첫 동행 엽서가 생긴다.
+4. 보유한 프리미엄 패스에서 시즌 Lv.5를 달성하면 **Lv.5 완주 동반자 팩 → 동반자 팩 열기 → 받기 → 동행으로 지정**을 누른다. 다시 방문 시연을 하면 **내 패스함**에 동반자의 첫 동행 엽서가 생긴다.
 5. 공개된 원을 선택한 뒤 **출발지로**와 **목적지로**를 각각 지정한다. 공개된 지점만으로 이어지는 구간이 금색 선으로 표시된다. 한 지역을 완주하고 시연 순위 3위 안에 들면 **랜드마크 이름 짓기**에서 완주 지점 하나와 이름을 정한다. 등록 후 시연 방문자별로 방문과 좋아요를 추가할 수 있으며, 방문자 한 명당 5 RP를 한 번 적립한다.
 
 내부 시연판에서는 **동반자 체험 → 캐릭터 선택 → 동행 홈에서 체험**으로 정차 중 홈에 캐릭터를 잠시 적용할 수 있다. 캐릭터는 홈 풍경에서 좌우로 이동하고, 누르면 멈춰서 인사한다. **체험 끝내기**를 누르거나 홈을 벗어나면 기존 동반자로 돌아간다. [내부 검토용 모션 목업](internal-demo/companion-motion-mockup.gif)
@@ -117,6 +117,10 @@ Demo와 Production 모두 같은 오프라인 지역 경계를 표시한다. 금
 ### 신규 디자인 이미지 적용
 
 원본 PNG를 `app/src/main/assets/journey/design/`에 둔다. 지도 배경 파일명은 `map-seoul.png`, `map-gangneung.png`, `map-gyeongju.png`, `map-jeju.png`다. 홈과 기록에 쓰는 파일은 `home-parked.png`, `care-car.png`, `drive-memory.png`, `drive-empty.png`다. 랜드마크에는 `landmark-creator-ticket.png`와 `landmark-placeholder.png`를, 안개 질감에는 `map-fog.png`를 사용한다. 이미지가 없는 빌드는 기존 엽서와 기본 UI를 사용한다.
+
+### 로컬 제목 글꼴
+
+Debug 빌드에서 제목에 Ok단단체를 쓰려면 [오케이티콘 공식 배포 페이지](https://www.okticon.com/freefont/?bmode=view&idx=169969648)에서 TTF를 받아 `development/local-fonts/res/font/carpet_heading.ttf`로 둔다. 이 로컬 폴더는 Git에서 제외된다. 기본 제목 글꼴은 주아체이며 메뉴와 대사는 고운돋움을 사용한다.
 
 ### 일반 Android AVD에서 디자인 확인
 

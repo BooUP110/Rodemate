@@ -14,6 +14,7 @@ import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -41,18 +42,18 @@ internal fun RoadmateHomeStage(
 
         BoxWithConstraints(Modifier.fillMaxSize().padding(insets)) {
             val wide = maxWidth >= 740.dp
-            val margin = if (wide) 30.dp else 14.dp
+            val margin = if (wide) 36.dp else 16.dp
+            val titleInset = margin + if (wide) 16.dp else 4.dp
             val actorSize = minOf(maxWidth * if (wide) .38f else .63f, maxHeight * if (wide) .64f else .34f)
             val actor = Modifier.align(BiasAlignment(if (wide) .65f else .35f, if (wide) .34f else -.30f)).size(actorSize)
             if (preview == null) OriginalCompanionPortrait(profile, actor, roam = true)
             else CompanionPreviewPortrait(preview, actor, roam = true)
 
             Column(Modifier.align(if (wide) BiasAlignment(-1f, .14f) else Alignment.BottomStart)
-                .padding(start = margin, end = margin, bottom = if (wide) 56.dp else 102.dp),
+                .padding(start = titleInset, end = margin, bottom = if (wide) 56.dp else 102.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("AI Roadmate", color = GamePaper, style = RoadmateType.heading.copy(
-                    fontSize = if (wide) 70.sp else 40.sp, lineHeight = if (wide) 78.sp else 48.sp,
-                    letterSpacing = (-1).sp))
+                Text(stringResource(R.string.app_name), color = GamePaper, style = RoadmateType.heading.copy(
+                    fontSize = if (wide) 70.sp else 40.sp, lineHeight = if (wide) 78.sp else 48.sp))
                 Text(profile.displayName, color = GameGold,
                     style = RoadmateType.cardTitle.copy(fontSize = if (wide) 28.sp else 22.sp, lineHeight = 34.sp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

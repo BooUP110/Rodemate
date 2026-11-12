@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">AI 로드메이트 (Demo)</string>
     <string name="build_mode">시뮬레이션 전용 · 실제 차량 데이터 아님</string>
     <string name="setup_pending">차량 데이터 연결을 확인해 주세요.</string>
     <string name="sdk_unavailable">차량 SDK 연동을 아직 검증하지 않았어요.</string>

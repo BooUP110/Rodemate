@@ -1,5 +1,6 @@
 package io.booup.roadmate
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -11,13 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,7 +24,8 @@ import io.booup.roadmate.model.*
 import io.booup.roadmate.trip.TripEvidenceMapper
 
 @Composable
-fun ExplorationContent(viewModel: RoadmateViewModel, context: VehicleContext, initialPlace: JourneyPlace?,
+internal fun ExplorationContent(viewModel: RoadmateViewModel, context: VehicleContext, initialPlace: JourneyPlace?,
+    route: Expedition, onRouteChange: (Expedition) -> Unit,
     openCollection: (JourneyPlace?) -> Unit, openMemory: () -> Unit, openSeason: () -> Unit,
     onSimulate: (JourneyPlace) -> Unit) {
     val trip by viewModel.tripUiState.collectAsStateWithLifecycle()
@@ -38,7 +38,6 @@ fun ExplorationContent(viewModel: RoadmateViewModel, context: VehicleContext, in
     val visits = trip.storage.visits.filter { it.source == source }
     val visited = visits.map { it.regionId }.toSet()
     val atlas = artwork("journey/postcards.png")
-    var route by remember(initialPlace) { mutableStateOf(Expedition.containing(initialPlace?.id) ?: Expedition.SEOUL) }
     val next = route.next(visited)
     val visible = route.revealed(visited)
     val count = route.places.count { it.id in visited }
@@ -55,71 +54,67 @@ fun ExplorationContent(viewModel: RoadmateViewModel, context: VehicleContext, in
     val current = verifiedExpeditionPoint(location).takeIf { !demo && it in visible }
     val landmark = gameState?.landmarks?.firstOrNull { Expedition.containing(it.pointId) == route && it.pointId in visited }
 
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("안개 너머, 우리의 한국", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-        progress.active?.let { RoadmateBadge("시즌 ${it.progress.totalXp} XP") }
-    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns = if (maxWidth >= 720.dp) 4 else 2
-        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Expedition.entries.chunked(columns).forEach { regions ->
-                Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     regions.forEach { region ->
                         val completed = region.places.count { it.id in visited }
-                        RegionCard(region, atlas, completed, route == region, Modifier.weight(1f)) { route = region }
+                        RegionCard(region, atlas, completed, route == region, Modifier.weight(1f)) { onRouteChange(region) }
                     }
                 }
             }
         }
     }
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp)).background(Color(0xFF283B58))) {
-        ExpeditionLandscape(route, atlas, Modifier.matchParentSize())
-        Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(
-            Color(0xE522304B), Color(0x48283E54), Color(0xB323304B)))))
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${route.label} 탐험", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                Text(route.theme, Modifier.weight(1f), color = Color(0xFFFFDC9A), style = MaterialTheme.typography.labelMedium)
-                Text("$count / ${route.places.size} 방문", color = Color.White, style = MaterialTheme.typography.labelLarge)
-            }
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val map: @Composable (Modifier) -> Unit = { modifier ->
-                    ExpeditionMap(route, visible, visited, selected.id, origin?.id, destination?.id, connection,
-                        landmark?.pointId, modifier.height(270.dp)) { selectedId = it.id }
-                }
-                val detail: @Composable (Modifier) -> Unit = { modifier ->
-                    RoadmateCard(modifier, compact = true) {
-                        val reached = selected.id in visited
-                        RoadmateBadge(if (reached) "✓ 방문 완료" else "✦ 다음 목표")
-                        Text(selected.name, style = MaterialTheme.typography.titleLarge)
-                        if (!reached) Text("첫 방문 보너스 +$EXPEDITION_FIRST_VISIT_XP XP",
-                            style = MaterialTheme.typography.bodySmall)
-                        if (demo && viewModel.canSimulateVisit) {
-                            Button(onClick = { onSimulate(selected) }, enabled = !journey.running,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
-                                Text(if (reached) "다시 방문 시연" else "방문 시연")
-                            }
-                        } else if (!reached) Text("확인된 방문 기록이 들어오면 다음 별이 열려요.", style = MaterialTheme.typography.bodySmall)
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { originId = selected.id }, modifier = Modifier.heightIn(min = 52.dp)) { Text("출발지로") }
-                            OutlinedButton(onClick = { destinationId = selected.id }, modifier = Modifier.heightIn(min = 52.dp)) { Text("목적지로") }
-                        }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("${route.label} 탐험", color = GamePaper, style = RoadmateType.cardTitle)
+            Text(route.theme, color = GameGold, style = RoadmateType.caption)
+        }
+        progress.active?.let { GamePill("${it.progress.totalXp} XP") }
+        GamePill("$count / ${route.places.size} 방문")
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val wide = maxWidth >= 730.dp
+        val map: @Composable (Modifier) -> Unit = { modifier ->
+            ExpeditionMap(route, visible, visited, selected.id, origin?.id, destination?.id, connection,
+                landmark?.pointId, modifier.height(if (wide) 260.dp else 230.dp)
+                    .background(GameInk.copy(alpha = .35f), RoundedCornerShape(22.dp))) { selectedId = it.id }
+        }
+        val detail: @Composable (Modifier) -> Unit = { modifier ->
+            Surface(modifier, shape = RoundedCornerShape(16.dp), color = GameInk.copy(alpha = .89f),
+                contentColor = GamePaper, border = BorderStroke(1.dp, GameGold.copy(alpha = .5f))) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val reached = selected.id in visited
+                    Text(if (reached) "✓ 방문 완료" else "✦ 다음 목표", color = GameGold, style = RoadmateType.caption)
+                    Text(selected.name, style = RoadmateType.heading)
+                    if (!reached) Text("첫 방문 보너스 +$EXPEDITION_FIRST_VISIT_XP XP", style = RoadmateType.metric)
+                    if (demo && viewModel.canSimulateVisit) {
+                        GameButton(if (reached) "다시 방문 시연" else "방문 시연", { onSimulate(selected) },
+                            Modifier.fillMaxWidth(), primary = true, enabled = !journey.running)
+                    } else if (!reached) Text("확인된 방문 기록이 들어오면 다음 별이 열려요.", style = RoadmateType.control)
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GameButton("출발지로", { originId = selected.id })
+                        GameButton("목적지로", { destinationId = selected.id })
                     }
-                }
-                if (maxWidth >= 750.dp) Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    map(Modifier.weight(1.6f)); detail(Modifier.weight(1f))
-                } else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    map(Modifier.fillMaxWidth()); detail(Modifier.fillMaxWidth())
-                }
-            }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                visible.forEach { place ->
-                    FilterChip(selected.id == place.id, { selectedId = place.id }, { Text(place.name) }, modifier = Modifier.heightIn(min = 48.dp),
-                        colors = FilterChipDefaults.filterChipColors(containerColor = Color(0xEFFFFAF3), labelColor = Color(0xFF273848)))
                 }
             }
         }
+        if (wide) Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            map(Modifier.weight(1.55f))
+            detail(Modifier.weight(1f))
+        } else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            map(Modifier.fillMaxWidth())
+            detail(Modifier.fillMaxWidth())
+        }
     }
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        visible.forEach { place ->
+            GameButton(place.name, { selectedId = place.id }, primary = selected.id == place.id)
+        }
+    }
+
     RoadmateCard {
         Text("별자리 경로", style = MaterialTheme.typography.titleMedium)
         Text(if (connection.isNotEmpty()) connection.joinToString(" → ") { it.name }
@@ -170,15 +165,14 @@ private fun ExpeditionLandscape(route: Expedition, atlas: ImageBitmap?, modifier
 private fun RegionCard(route: Expedition, atlas: ImageBitmap?, count: Int, selected: Boolean, modifier: Modifier, select: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     Surface(modifier.height(76.dp), shape = shape,
-        border = androidx.compose.foundation.BorderStroke(if (selected) 3.dp else 1.dp,
-            if (selected) Color(0xFFECAD60) else Color(0xFFEEE0D3))) {
+        border = BorderStroke(if (selected) 2.dp else 1.dp, GameGold.copy(alpha = if (selected) 1f else .45f))) {
         Box(Modifier.fillMaxSize().clickable(role = Role.Button, onClick = select)) {
             ExpeditionLandscape(route, atlas, Modifier.matchParentSize())
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xED233246)))))
             Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(route.label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 24.sp)
-                Text("$count / ${route.places.size} 방문", color = Color(0xFFFFEAC9), fontSize = 14.sp, lineHeight = 18.sp)
+                Text(route.label, color = GamePaper, style = RoadmateType.cardTitle.copy(fontSize = 21.sp, lineHeight = 26.sp))
+                Text("$count / ${route.places.size} 방문", color = GameGold, style = RoadmateType.caption)
             }
         }
     }
