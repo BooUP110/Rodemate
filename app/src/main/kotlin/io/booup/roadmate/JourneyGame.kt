@@ -1,6 +1,7 @@
 package io.booup.roadmate
 
 import io.booup.roadmate.model.CompanionId
+import io.booup.roadmate.model.CompanionProfiles
 import io.booup.roadmate.model.DataSource
 import io.booup.roadmate.model.ProgressUiState
 import io.booup.roadmate.model.RegionEvidenceSource
@@ -41,7 +42,10 @@ data class JourneyGameState(
     val landmarks: List<ExpeditionLandmark> = emptyList(),
     val moonlightCompleted: Int = 0,
     val moonlightOutfit: String? = null,
+    val companionSlots: List<CompanionId?> = DEFAULT_COMPANION_SLOTS,
 )
+
+internal val DEFAULT_COMPANION_SLOTS = listOf(CompanionProfiles.dodam.id, CompanionProfiles.somsom.id, null)
 
 internal val coastalPlaces = listOf(journeyPlaces[1], journeyPlaces[3])
 internal const val JOURNEY_SEASON_ID = "roadmate-collab-journey-1"
@@ -193,6 +197,24 @@ class JourneyGame(private val storage: () -> TripStorageState,
     }
 
     suspend fun useDefaultCompanion() = update { it.copy(equipped = null, equippedAt = 0) }
+
+    internal suspend fun prepareCollabTour(cast: List<CompanionId>) = update { current ->
+        val available = JourneyPass.TRAVEL.companionIds().filter { it in cast }
+        current.copy(companions = current.companions + available,
+            companionSlots = List(DEFAULT_COMPANION_SLOTS.size) { available.getOrNull(it) })
+    }
+
+    internal suspend fun setCompanionSlot(index: Int, id: CompanionId?) = update { current ->
+        if (index !in current.companionSlots.indices || (id != null && id !in current.companions &&
+                CompanionProfiles.all.none { it.id == id })) return@update current
+        current.copy(companionSlots = current.companionSlots.mapIndexed { slot, previous ->
+            when {
+                slot == index -> id
+                previous == id -> null
+                else -> previous
+            }
+        })
+    }
 
     internal suspend fun completeMoonlightChapter(chapter: MoonlightChapter, answer: Int) = mutex.withLock {
         val current = data.value

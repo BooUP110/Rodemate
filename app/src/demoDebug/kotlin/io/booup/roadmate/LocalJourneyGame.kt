@@ -61,6 +61,7 @@ internal fun encodeJourneyGame(state: JourneyGameState) = JSONObject().apply {
     put("progressResetAt", state.progressResetAt)
     put("moonlightCompleted", state.moonlightCompleted)
     put("moonlightOutfit", state.moonlightOutfit ?: JSONObject.NULL)
+    put("companionSlots", JSONArray(state.companionSlots.map { it?.value ?: JSONObject.NULL }))
     put("landmarks", JSONArray(state.landmarks.map {
         JSONObject().put("pointId", it.pointId.value).put("name", it.name)
             .put("visitors", JSONArray(it.visitors.toList())).put("likes", JSONArray(it.likes.toList()))
@@ -92,6 +93,11 @@ internal fun decodeJourneyGame(encoded: String): JourneyGameState {
         moonlightOutfit = MoonlightOutfit.entries.firstOrNull {
             it.name == data.optString("moonlightOutfit") && it.claimKey in claims
         }?.name,
+        companionSlots = data.optJSONArray("companionSlots")?.let { slots ->
+            List(DEFAULT_COMPANION_SLOTS.size) { index ->
+                slots.optString(index).takeIf { !slots.isNull(index) && it.isNotBlank() }?.let(::CompanionId)
+            }
+        } ?: DEFAULT_COMPANION_SLOTS,
         landmarks = entries("landmarks") { values, index -> values.getJSONObject(index).let { entry ->
             fun people(key: String) = entry.getJSONArray(key).let { ids ->
                 (0 until ids.length()).map { ids.getInt(it) }.filter { it in 1..3 }.toSet()

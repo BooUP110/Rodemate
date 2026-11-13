@@ -56,7 +56,7 @@ internal fun DemoScreenTour(visible: Boolean, close: () -> Unit) {
             tourModel = ViewModelProvider(owner, object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
                     requireNotNull(modelClass.cast(RoadmateViewModel { scope ->
-                        RuntimeBindings.create(scope, clock, tourStorage = storage)
+                        RuntimeBindings.create(scope, clock, previews = localCompanionPreviews(context.assets), tourStorage = storage)
                     }))
             })[RoadmateViewModel::class.java]
             awaitCancellation()
@@ -122,6 +122,14 @@ internal fun DemoScreenTour(visible: Boolean, close: () -> Unit) {
                             stop = target
                             showIndex = false
                         }, Modifier.fillMaxWidth(), primary = stop == target)
+                    }
+                    if (viewModel.companionPreviews.any { it.profile.id in JourneyPass.TRAVEL.companionIds() }) {
+                        GameButton("콜라보 캐릭터 시연", {
+                            val cast = viewModel.companionPreviews.map { it.profile.id }.filter { it in JourneyPass.TRAVEL.companionIds() }
+                            viewModel.journeyAction { prepareCollabTour(cast) }
+                            stop = TourStop.HOME
+                            showIndex = false
+                        }, Modifier.fillMaxWidth())
                     }
                 }
             }, confirmButton = { GameButton("닫기", { showIndex = false }) })

@@ -60,10 +60,13 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     var page by rememberSaveable { mutableStateOf(startPage) }
     var touring by remember { mutableStateOf(false) }
     var homeTrial by remember { mutableStateOf<CompanionPreview?>(null) }
+    var rosterOpen by rememberSaveable { mutableStateOf(false) }
+    var wardrobeOpen by rememberSaveable { mutableStateOf(false) }
     var returnToMap by remember { mutableStateOf(false) }
     var mapPlace by remember { mutableStateOf<JourneyPlace?>(null) }
     var expedition by remember { mutableStateOf(if (tourStop == TourStop.MAP) Expedition.GANGNEUNG else Expedition.SEOUL) }
     var albumPlace by remember { mutableStateOf<JourneyPlace?>(null) }
+    var albumStoryCompanion by remember { mutableStateOf<CompanionProfile?>(null) }
     var storyOpen by rememberSaveable { mutableStateOf(tourStop == TourStop.STORY) }
     var storyBeat by rememberSaveable {
         mutableStateOf(if (tourStop == TourStop.STORY) MoonlightBeat.GREETING else MoonlightBeat.COVER)
@@ -85,6 +88,12 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     val clock = remember { AndroidContextClock() }
     val full = DrivingPresentationPolicy().mode(context, clock.now()) == DrivingPresentationMode.FULL_PARKED
     val canBrowse = full && post.contentAllowed
+    val equipCompanion: (CompanionId) -> Unit = { id ->
+        homeTrial = null
+        if (gameState == null) viewModel.selectCompanion(id)
+        else if (id in gameState.companions) viewModel.equipJourneyCompanion(id)
+        else viewModel.equipDefaultCompanion(id)
+    }
     val canStartTour = canBrowse && !journey.running && context.mode == RuntimeMode.DEMO && screenTour != null
     val modeLabel = if (previews.isNotEmpty()) "내부 콜라보 시연"
         else simulationLabel ?: "실제 차량 정보 · 읽기 전용"
@@ -97,6 +106,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
         focus.clearFocus()
         keyboard?.hide()
         if (target == RoadmatePage.MAP && (page != RoadmatePage.MAP || mapPlace != null)) showMap(null)
+        albumStoryCompanion = null
         if (target == RoadmatePage.COLLECTION) albumPlace = null
         page = target
     }
@@ -122,6 +132,10 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     }
     LaunchedEffect(page, canBrowse) {
         if (page != RoadmatePage.HOME || !canBrowse) homeTrial = null
+        if (!canBrowse) {
+            rosterOpen = false
+            wardrobeOpen = false
+        }
     }
     LaunchedEffect(journey.running, canBrowse, returnToMap) {
         if (returnToMap && !journey.running && canBrowse) {
@@ -147,6 +161,11 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
             if (canStartTour) return@RoadmateTheme
         }
         Scaffold { insets ->
+            if (canBrowse && rosterOpen) {
+                CompanionRoster(care.companion, gameState, viewModel, equipCompanion) { rosterOpen = false }
+            } else if (canBrowse && wardrobeOpen && gameState != null) {
+                MoonlightWardrobe(gameState, viewModel, care.companion, activePreview) { wardrobeOpen = false }
+            }
             if (tourStop == TourStop.VEHICLE && canBrowse) {
                 RoadmateChapter("차량 상태", "home-parked.png", 3, modeLabel, insets, navigation, priorityCare) {
                     HomeVehicleCard(context, demo = true, viewModel::readParkedWarnings, Modifier.widthIn(max = 540.dp))
@@ -185,7 +204,14 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                         storyChapter = MoonlightChapter.entries[storyChapter.ordinal + 1]
                         storyBeat = MoonlightBeat.GREETING
                     },
-                    openAlbum = { albumPlace = storyChapter.place; page = RoadmatePage.COLLECTION; storyOpen = false },
+                    openRoster = { rosterOpen = true },
+                    openWardrobe = { wardrobeOpen = true },
+                    openAlbum = {
+                        albumPlace = storyChapter.place
+                        albumStoryCompanion = care.companion
+                        page = RoadmatePage.COLLECTION
+                        storyOpen = false
+                    },
                     priorityCare = {
                         CareContent(care, { viewModel.respond(it) }, { id, revision -> viewModel.displayed(id, revision) },
                             { viewModel.selectCompanion(it) }, showCompanionPicker = false)
@@ -194,18 +220,13 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
             }
             if (page == RoadmatePage.HOME && canBrowse) {
                 val trial = homeTrial
-                val owned = if (gameState == null) previews else previews.filter { it.profile.id in gameState.companions }
                 RoadmateHomeStage(insets, trial?.profile ?: care.companion, trial ?: activePreview,
-                    CompanionProfiles.all + owned.map { it.profile }, modeLabel,
+                    modeLabel,
                     UiCopy.trip(trip.runtime.state, trip.runtime.recoveryRequired), post.collection.size,
                     progress.active?.progress?.totalXp, openStory.takeIf { canPlayStory && !journey.running },
                     openMap = { showMap(journey.place.takeIf { journey.saved }) },
-                    selectCompanion = { id ->
-                        homeTrial = null
-                        if (gameState == null) viewModel.selectCompanion(id)
-                        else if (id in gameState.companions) viewModel.equipJourneyCompanion(id)
-                        else viewModel.equipDefaultCompanion(id)
-                    },
+                    openRoster = { rosterOpen = true },
+                    openWardrobe = if (gameState != null && trial == null) { { wardrobeOpen = true } } else null,
                     endTrial = if (trial == null) null else { { homeTrial = null } },
                     navigation = navigation, priorityCare = priorityCare) {
                     HomeVehicleCard(context, simulationLabel != null, viewModel::readParkedWarnings)
@@ -223,7 +244,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                 (previews.isNotEmpty() || tourStop == TourStop.DRAW)) {
                 JourneyPassContent(viewModel, game, "정차 · ${UiCopy.connection(context.connection.status)}",
                     modifier = Modifier.fillMaxSize(), insets = insets,
-                    openAlbum = { albumPlace = null; page = RoadmatePage.COLLECTION },
+                    openAlbum = { albumStoryCompanion = null; albumPlace = null; page = RoadmatePage.COLLECTION },
                     openMemory = { page = RoadmatePage.MEMORY }, openHome = { page = RoadmatePage.HOME },
                     openStory = openStory.takeIf { canPlayStory && !journey.running },
                     tryOnHome = { homeTrial = it; page = RoadmatePage.HOME },
@@ -254,16 +275,23 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                                 demoControls?.invoke()
                             }
                             RoadmatePage.MEMORY -> PostDriveContent(viewModel,
-                                openAlbum = { albumPlace = it; page = RoadmatePage.COLLECTION },
+                                openAlbum = { albumStoryCompanion = null; albumPlace = it; page = RoadmatePage.COLLECTION },
                                 openMap = showMap,
                                 openSeason = { page = RoadmatePage.SEASON }, showHeader = false)
                             RoadmatePage.MAP -> ExplorationContent(viewModel, context,
                                 initialPlace = mapPlace, route = expedition, onRouteChange = { expedition = it },
-                                openCollection = { albumPlace = it; page = RoadmatePage.COLLECTION },
+                                openCollection = { albumStoryCompanion = null; albumPlace = it; page = RoadmatePage.COLLECTION },
                                 openMemory = { page = RoadmatePage.MEMORY }, openSeason = { page = RoadmatePage.SEASON },
                                 onSimulate = { place -> viewModel.simulateVisit(place); returnToMap = true })
-                            RoadmatePage.COLLECTION -> CollectionContent(viewModel, activePreview, albumPlace, showMap)
-                            RoadmatePage.SETTINGS -> RecordSettingsContent(viewModel)
+                            RoadmatePage.COLLECTION -> CollectionContent(viewModel, activePreview, albumPlace, showMap,
+                                storyCompanion = albumStoryCompanion)
+                            RoadmatePage.SETTINGS -> {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    GameButton("동행 선택", { rosterOpen = true })
+                                    if (gameState != null) GameButton("옷장", { wardrobeOpen = true })
+                                }
+                                RecordSettingsContent(viewModel)
+                            }
                             RoadmatePage.HOME, RoadmatePage.SEASON -> Unit
                         }
                     }

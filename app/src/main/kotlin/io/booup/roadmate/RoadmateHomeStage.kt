@@ -18,18 +18,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import io.booup.roadmate.model.CompanionId
 import io.booup.roadmate.model.CompanionProfile
 
 @Composable
 internal fun RoadmateHomeStage(
-    insets: PaddingValues, profile: CompanionProfile, preview: CompanionPreview?, profiles: List<CompanionProfile>,
+    insets: PaddingValues, profile: CompanionProfile, preview: CompanionPreview?,
     status: String, drivingState: String, postcards: Int, xp: Long?, openStory: (() -> Unit)?,
-    openMap: () -> Unit, selectCompanion: (CompanionId) -> Unit, endTrial: (() -> Unit)?,
+    openMap: () -> Unit, openRoster: () -> Unit, openWardrobe: (() -> Unit)?, endTrial: (() -> Unit)?,
     navigation: @Composable () -> Unit, priorityCare: @Composable () -> Unit,
     vehicleDetails: @Composable ColumnScope.() -> Unit,
 ) {
-    var chooseCompanion by remember { mutableStateOf(false) }
     var showVehicle by remember { mutableStateOf(false) }
     val atlas = artwork("journey/postcards.png")
     Box(Modifier.fillMaxSize().background(GameInk)) {
@@ -46,8 +44,8 @@ internal fun RoadmateHomeStage(
             val titleInset = margin + if (wide) 16.dp else 4.dp
             val actorSize = minOf(maxWidth * if (wide) .38f else .63f, maxHeight * if (wide) .64f else .34f)
             val actor = Modifier.align(BiasAlignment(if (wide) .65f else .35f, if (wide) .34f else -.30f)).size(actorSize)
-            if (preview == null) OriginalCompanionPortrait(profile, actor, roam = true)
-            else CompanionPreviewPortrait(preview, actor, roam = true)
+            if (preview == null) OriginalCompanionPortrait(profile, actor, roam = true, onOpenRoster = openRoster)
+            else CompanionPreviewPortrait(preview, actor, roam = true, onOpenRoster = openRoster)
 
             Column(Modifier.align(if (wide) BiasAlignment(-1f, .14f) else Alignment.BottomStart)
                 .padding(start = titleInset, end = margin, bottom = if (wide) 56.dp else 102.dp),
@@ -65,7 +63,8 @@ internal fun RoadmateHomeStage(
             Row(Modifier.align(if (wide) BiasAlignment(.92f, .66f) else BiasAlignment(1f, .02f))
                 .padding(horizontal = margin), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (endTrial != null) GameButton("체험 끝내기", endTrial)
-                GameButton("동행 바꾸기", { chooseCompanion = true })
+                GameButton("동행 바꾸기", openRoster)
+                if (openWardrobe != null) GameButton("옷장", openWardrobe)
             }
 
             Box(Modifier.align(Alignment.BottomCenter).padding(horizontal = margin, vertical = 12.dp)) {
@@ -86,19 +85,6 @@ internal fun RoadmateHomeStage(
             }
         }
     }
-
-    if (chooseCompanion) AlertDialog(onDismissRequest = { chooseCompanion = false }, containerColor = GameInk,
-        title = { Text("함께할 동행", color = GamePaper) }, text = {
-            Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                profiles.distinctBy { it.displayName }.forEach { option ->
-                    GameButton(option.displayName, {
-                        selectCompanion(option.id)
-                        chooseCompanion = false
-                    }, Modifier.fillMaxWidth(), primary = option.id == profile.id)
-                }
-            }
-        }, confirmButton = { GameButton("닫기", { chooseCompanion = false }) })
 
     if (showVehicle) AlertDialog(onDismissRequest = { showVehicle = false },
         title = { Text(drivingState, style = MaterialTheme.typography.titleMedium) }, text = {

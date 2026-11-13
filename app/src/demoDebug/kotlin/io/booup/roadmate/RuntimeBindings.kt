@@ -79,7 +79,7 @@ object RuntimeBindings {
                 storage = { tourStorage.state.value }, progress = { progress.uiState.value },
                 controlsAllowed = requireNotNull(post)::controlsAllowed, now = { clock.now().epochMillis },
                 initial = JourneyGameState(),
-                persist = { true }, passes = listOf(JourneyPass.COAST, JourneyPass.STARS),
+                persist = { true }, passes = if (previews.isEmpty()) listOf(JourneyPass.COAST, JourneyPass.STARS) else JourneyPass.entries,
             )
             journey != null && appContext != null && progress != null -> localJourneyGame(appContext, progress, post, clock)
             else -> null

@@ -82,7 +82,7 @@ Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형�
 
 ### 내부 콜라보 미리보기
 
-로컬 `development/collab-preview/assets/companion-previews/`에 `catalog.json`과 각 초상화를 둔다. 카탈로그는 `id`, `name`, `seasonTitle`과 선택 항목 `tone`(`WARM` 또는 `CALM`)을 담은 객체 배열이다. `<id>.png` 또는 `<id>-idle.png`를 사용한다. 동작 파일의 2×2 칸은 왼쪽 위부터 오른쪽 아래 순으로 읽는다. 두 빌드의 앱 이름은 `app/src/main/res/values/strings.xml`의 `app_name`을 사용한다.
+로컬 `development/collab-preview/assets/companion-previews/`에 `catalog.json`과 각 초상화를 둔다. 카탈로그는 `id`, `name`, `seasonTitle`과 선택 항목 `tone`(`WARM` 또는 `CALM`)을 담은 객체 배열이다. `<id>.png` 또는 `<id>-idle.png`를 사용한다. 별도 이미지가 없는 `starlight`와 `waveotter` 항목은 기본 동행의 번호가 붙은 동작 시트를 함께 사용한다. 동작 파일의 2×2 칸은 왼쪽 위부터 오른쪽 아래 순으로 읽는다. 두 빌드의 앱 이름은 `app/src/main/res/values/strings.xml`의 `app_name`을 사용한다.
 
 시즌 화면의 일러스트는 로컬 `development/collab-preview/assets/pass-worlds/`에 `travel.jpg`, `stars.jpg`, `coast.jpg`, `post.jpg`로 둔다. 해당 이미지가 없는 빌드는 테마별 그라데이션 배경을 사용한다.
 
@@ -90,7 +90,7 @@ Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형�
 .\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:mergeDemoDebugAssets --rerun :app:packageInternalCollab
 ~~~
 
-내부 APK는 `development/collab-preview/apk/roadmate-collab-debug.apk`에 복사되고 앱 ID는 `io.booup.roadmate.demo.collab`이다. 로컬 `development/`는 Git 제외 경로다. 내부 이미지가 담긴 APK는 가상 콜라보 시연용으로 관리한다.
+내부 APK는 `development/collab-preview/apk/roadmate-collab-debug.apk`에 복사되고 앱 ID는 `io.booup.roadmate.demo.collab`이다. 로컬 `development/`는 Git 제외 경로다. 내부 이미지가 담긴 APK는 가상 콜라보 시연용으로 관리한다. 협업 저장소의 내부 시연 사전 릴리스에서 `roadmate-collab-debug.apk`를 바로 설치할 수 있다. Android Studio에서 빌드하려면 `roadmate-collab-assets.zip`을 `development/collab-preview/`에 풀어 기존 `assets/` 경로와 합친다.
 
 Android Studio에서 `C:/Users/scspr/WorkSpace/Rodemate`를 프로젝트로 열고 `demoDebug`로 기본 Run을 누르면 **카펫**(`io.booup.roadmate.demo`)이 실행된다. 정차 시 동행 홈 전체에 풍경과 캐릭터가 펼쳐진다. `차량 상태`에서 차량 정보를 열고, `강릉 이야기`에서 오리지널 동행과 함께 장소별 일러스트를 본다. 하단의 `시즌 패스`에서 보상과 무료·프리미엄 진행도를 확인한다. `roadmateInternalCollabs`를 지정한 빌드도 **카펫**(`io.booup.roadmate.demo.collab`)으로 표시되며 홈에 `내부 콜라보 시연` 배지가 붙는다. 이 빌드는 로컬 시연 캐릭터와 콜라보 시즌 화면을 포함한다. 두 앱은 각각의 저장 데이터를 사용한다.
 

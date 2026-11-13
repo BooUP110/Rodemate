@@ -9,6 +9,23 @@ import org.junit.Test
 import kotlin.random.Random
 
 class JourneyGameTest {
+    @Test fun companionSlotsMoveOwnedCharactersWithoutChangingTheActiveCompanion() = runBlocking {
+        val fixture = Fixture().apply { parked = true }
+        val collab = JourneyPass.TRAVEL.companionIds().first()
+        val locked = JourneyPass.TRAVEL.companionIds()[1]
+        fixture.saved = JourneyGameState(companions = setOf(collab), equipped = collab)
+        val game = fixture.create()
+        assertFalse(game.setCompanionSlot(0, locked))
+        assertFalse(game.setCompanionSlot(3, collab))
+        assertTrue(game.setCompanionSlot(2, collab))
+        assertTrue(game.setCompanionSlot(0, collab))
+        assertEquals(listOf(collab, CompanionProfiles.somsom.id, null), fixture.create().state.value.companionSlots)
+        assertTrue(game.setCompanionSlot(0, null))
+        assertEquals(collab, fixture.create().state.value.equipped)
+        fixture.parked = false
+        assertFalse(game.setCompanionSlot(2, collab))
+    }
+
     @Test fun moonlightChaptersRequireOrderedDemoVisitsAndPremiumRewardsRequireEntitlement() = runBlocking {
         val fixture = Fixture().apply { parked = true }
         val game = fixture.create()

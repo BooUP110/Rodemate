@@ -25,7 +25,7 @@ private enum class AlbumFilter(val label: String) { ALL("전체"), OWNED("보유
 
 @Composable
 fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, initialPlace: JourneyPlace? = null,
-    openMap: (JourneyPlace?) -> Unit) {
+    openMap: (JourneyPlace?) -> Unit, storyCompanion: CompanionProfile? = null) {
     val state by viewModel.postDriveUiState.collectAsStateWithLifecycle()
     val care by viewModel.uiState.collectAsStateWithLifecycle()
     if (!state.contentAllowed) return
@@ -131,6 +131,10 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
     owned.values.firstOrNull { it.key == detail }?.let { card ->
         val place = journeyPlace(card.key.regionId)
         val postcardCompanion = tripMascot(card)
+        val storyActor = storyCompanion.takeIf { initialPlace?.id == card.key.regionId }
+        val storyPreview = preview?.takeIf { it.profile.id == storyActor?.id }
+        val storyOriginal = storyActor?.takeIf { actor -> CompanionProfiles.all.any { it.id == actor.id } }
+        val detailPreview = storyPreview ?: postcardCompanion.takeIf { storyOriginal == null } ?: preview.takeIf { game == null }
         var back by remember(card.key) { mutableStateOf(true) }
         val turn by animateFloatAsState(if (back) 180f else 0f, tween(400), label = "postcard turn")
         LaunchedEffect(card.key) { back = false }
@@ -140,8 +144,9 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
                     rotationY = if (turn < 90f) turn else turn - 180f
                     cameraDistance = density * 18f
                 }) {
-                    if (turn < 90f) PostcardArtwork(place, art, postcardCompanion ?: preview.takeIf { game == null },
-                        Modifier.matchParentSize(), animate = true, companion = care.companion.takeIf { game == null })
+                    if (turn < 90f) PostcardArtwork(place, art, detailPreview,
+                        Modifier.matchParentSize(), animate = true,
+                        companion = storyOriginal ?: care.companion.takeIf { game == null })
                     else Box(Modifier.matchParentSize().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF6E5C5)),
                         contentAlignment = Alignment.Center) {
                         Text("${stringResource(R.string.app_name)} · 여행 소인", style = MaterialTheme.typography.titleMedium)
@@ -185,8 +190,10 @@ internal fun PostcardArtwork(place: JourneyPlace?, atlas: ImageBitmap?, preview:
     Box(modifier.clip(RoundedCornerShape(16.dp)).background(GameInk)) {
         if (place != null && atlas != null) AtlasFrame(atlas, place.art, Modifier.matchParentSize(), fill = true)
         else RoadmateLandscape("drive-memory.png", place?.art ?: 2, Modifier.matchParentSize(), atlas)
-        if (preview != null) CompanionPreviewPortrait(preview, Modifier.align(Alignment.BottomEnd).size(102.dp), animate)
-        else if (companion != null) OriginalCompanionPortrait(companion, Modifier.align(Alignment.BottomEnd).size(102.dp),
-            animate, otterMotion = OtterMotion.GIVE_POSTCARD)
+        val original = preview?.original ?: companion
+        if (preview != null && preview.original == null) PreviewCompanionPortrait(preview,
+            Modifier.align(Alignment.BottomEnd).size(102.dp), animate, motion = CompanionMotion.GIVE_POSTCARD)
+        else if (original != null) OriginalCompanionPortrait(original, Modifier.align(Alignment.BottomEnd).size(102.dp),
+            animate, motion = CompanionMotion.GIVE_POSTCARD)
     }
 }
