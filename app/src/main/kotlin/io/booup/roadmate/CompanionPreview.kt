@@ -155,7 +155,7 @@ private fun motionFrames(path: String?): MotionFrames? {
 }
 
 @Composable
-private fun CompanionArtwork(portrait: String, idleAtlas: String?, description: String, modifier: Modifier,
+internal fun CompanionArtwork(portrait: String, idleAtlas: String?, description: String, modifier: Modifier,
     animate: Boolean, roam: Boolean, motion: CompanionMotion? = null, motionPath: String? = null,
     roamPaths: Map<CompanionMotion, String> = emptyMap(),
     onOpenRoster: (() -> Unit)? = null,

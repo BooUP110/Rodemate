@@ -19,6 +19,13 @@ if (internalCollabs) {
         into(preview.dir("apk"))
         rename { "roadmate-collab-debug.apk" }
     }
+    // Contest submission file: apk/<team>_<app>_release.apk (git-ignored; upload it to GitHub Releases).
+    tasks.register<Copy>("packageContestRelease") {
+        dependsOn("assembleDemoRelease")
+        from(layout.buildDirectory.file("outputs/apk/demo/release/app-demo-release.apk"))
+        into(rootProject.layout.projectDirectory.dir("apk"))
+        rename { "BooUP_카펫_release.apk" }
+    }
 }
 
 android {
@@ -31,7 +38,7 @@ android {
         minSdk = 28
         targetSdk = 35
         versionCode = 1
-        versionName = "0.7.0-phase7"
+        versionName = "1.0.0"
     }
 
     flavorDimensions += "environment"
@@ -67,15 +74,24 @@ android {
             assets.srcDir(preview.resolve("assets"))
             res.srcDir(preview.resolve("res"))
         }
+        // The contest asks for an installable release APK: reuse the demo runtime, sign with the debug key (never a store key).
+        sourceSets.maybeCreate("demoRelease").apply {
+            java.srcDir("src/demoDebug/kotlin")
+            assets.srcDirs("src/demoDebug/assets", preview.resolve("assets"))
+            res.srcDir(preview.resolve("res"))
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("debug")
     }
     // Platform-provided AAOS API, not packaged SDK classes or an invented Maven artifact.
     useLibrary("android.car")
 }
 
 // Prevent a release artifact that could accidentally contain demo fixtures.
+// Only the explicit internal collab build (-ProadmateInternalCollabs) makes the contest demo release.
 androidComponents {
     beforeVariants(selector().withBuildType("release")) { variant ->
-        if (isolatedAcceptance || variant.productFlavors.any { it.second == "demo" }) variant.enable = false
+        val demo = variant.productFlavors.any { it.second == "demo" }
+        if (isolatedAcceptance || (demo && !internalCollabs)) variant.enable = false
     }
 }
 

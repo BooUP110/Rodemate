@@ -36,7 +36,9 @@ import io.booup.roadmate.model.CompanionProfiles
 internal fun CompanionRoster(current: CompanionProfile, state: JourneyGameState?, viewModel: RoadmateViewModel,
     equip: (CompanionId) -> Unit, close: () -> Unit) {
     val previews = viewModel.companionPreviews.associateBy { it.profile.id }
-    val profiles = (CompanionProfiles.all + previews.values.map { it.profile }).associateBy { it.id }
+    // Locked collab teasers appear only beside the internal collab characters.
+    val teasers = if (previews.isEmpty()) emptyList() else upcomingCompanions.map { it.first }
+    val profiles = (CompanionProfiles.all + previews.values.map { it.profile } + teasers).associateBy { it.id }
     val owned = CompanionProfiles.all.map { it.id }.toSet() + (state?.companions ?: previews.keys)
     val slots = state?.companionSlots.orEmpty()
     var slot by remember { mutableIntStateOf(slots.indexOf(current.id).coerceAtLeast(0)) }
@@ -44,8 +46,10 @@ internal fun CompanionRoster(current: CompanionProfile, state: JourneyGameState?
     var editing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    var previewing by remember { mutableStateOf<UpcomingCollab?>(null) }
     val focus = profiles[highlighted] ?: current
     val preview = previews[focus.id]
+    val upcoming = upcomingCollabOf(focus.id)
     val currentSlot = slots.getOrNull(slot)
     val visibleProfiles = profiles.values.filter { profile ->
         previews[profile.id]?.original == null || profile.id in owned
@@ -97,9 +101,12 @@ internal fun CompanionRoster(current: CompanionProfile, state: JourneyGameState?
                             Text(when {
                                 focus.id == current.id -> "현재 동행 중"
                                 focus.id in owned -> preview?.seasonTitle ?: "기본 동행"
+                                upcoming != null -> "${upcoming.title} · 콜라보 예시"
                                 else -> "${preview?.seasonTitle.orEmpty()} 패스 보상"
                             }, color = GameGold, style = RoadmateType.metric, textAlign = TextAlign.Center)
-                            if (!editing) GameButton(
+                            if (!editing && upcoming != null) GameButton("패스 미리보기", { previewing = upcoming },
+                                Modifier.widthIn(min = 172.dp))
+                            else if (!editing) GameButton(
                                 when (focus.id) { current.id -> "현재 동행 중"; in owned -> "이 동행과 출발"; else -> "아직 잠겨 있어요" },
                                 { equip(focus.id); close() }, Modifier.widthIn(min = 172.dp), primary = focus.id in owned && focus.id != current.id,
                                 enabled = focus.id in owned && focus.id != current.id)
@@ -141,8 +148,12 @@ internal fun CompanionRoster(current: CompanionProfile, state: JourneyGameState?
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                                 items(visibleProfiles, key = { it.id.value }) { profile ->
                                     CharacterTile(profile, previews[profile.id], profile.displayName,
-                                        when (profile.id) { current.id -> "동행 중"; in owned -> "보유"; else -> "잠김" },
+                                        when (profile.id) {
+                                            current.id -> "동행 중"; in owned -> "보유"
+                                            else -> if (upcomingCollabOf(profile.id) != null) "예시" else "잠김"
+                                        },
                                         profile.id == highlighted, Modifier.width(106.dp), profile.id !in owned) {
+                                        RoadmateSounds.play(if (profile.id in owned) RoadmateSound.TAP else RoadmateSound.LOCKED)
                                         highlighted = profile.id
                                         failed = false
                                     }
@@ -161,6 +172,7 @@ internal fun CompanionRoster(current: CompanionProfile, state: JourneyGameState?
             }
         }
     }
+    previewing?.let { UpcomingPassPreview(it) { previewing = null } }
 }
 
 @Composable
@@ -182,6 +194,10 @@ private fun CharacterTile(profile: CompanionProfile?, preview: CompanionPreview?
 
 @Composable
 internal fun CompanionCardPortrait(profile: CompanionProfile, preview: CompanionPreview?, modifier: Modifier, animate: Boolean = false) {
-    if (preview == null) OriginalCompanionPortrait(profile, modifier, animate = animate)
-    else CompanionPreviewPortrait(preview, modifier, animate = animate)
+    val upcoming = upcomingCollabOf(profile.id)
+    when {
+        upcoming != null -> UpcomingPortrait(profile, upcoming, modifier, animate)
+        preview == null -> OriginalCompanionPortrait(profile, modifier, animate = animate)
+        else -> CompanionPreviewPortrait(preview, modifier, animate = animate)
+    }
 }

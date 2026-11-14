@@ -1,6 +1,6 @@
 # MVP 범위
 
-현재 구현 범위는 실제 Production 기능과 Demo 체험을 구분한다. SDK/API 문서 존재, 계정 사용권, AVD 동작, 실차/Market 승인은 각각 별개다. **USER_ACCEPTANCE_PENDING**이며 전체 차량 Care가 활성화된 제품으로 설명하지 않는다.
+현재 구현 범위는 실제 Production 기능과 Demo 체험을 구분한다. SDK/API 문서 존재, 계정 사용권, AVD 동작, 실차/Market 승인은 각각 별개다. 전체 차량 Care가 활성화된 제품으로 설명하지 않는다.
 
 | 영역 | Production 현재 상태 | Demo |
 |---|---|---|

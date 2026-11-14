@@ -74,14 +74,17 @@ object RuntimeBindings {
         val progress=post?.let { ProgressCoordinator(requireNotNull(storage),RuntimeMode.DEMO,clock,{it.controlsAllowed()},
             initialSeasons = listOf(journeySeason(previews.firstOrNull())),
             catalog = if (previews.isEmpty() && tourStorage == null) ProgressDemoScenarios.catalog else null, seedOnlyWhenEmpty = true) }
+        // Contest demo: the Chiikawa trip companions start unlocked whenever their local art is installed.
+        val starters = JourneyPass.TRAVEL.companionIds().filter { id -> previews.any { it.profile.id == id } }.toSet()
         val game = when {
             tourStorage != null && progress != null -> JourneyGame(
                 storage = { tourStorage.state.value }, progress = { progress.uiState.value },
                 controlsAllowed = requireNotNull(post)::controlsAllowed, now = { clock.now().epochMillis },
                 initial = JourneyGameState(),
                 persist = { true }, passes = if (previews.isEmpty()) listOf(JourneyPass.COAST, JourneyPass.STARS) else JourneyPass.entries,
+                starterCompanions = starters,
             )
-            journey != null && appContext != null && progress != null -> localJourneyGame(appContext, progress, post, clock)
+            journey != null && appContext != null && progress != null -> localJourneyGame(appContext, progress, post, clock, starters)
             else -> null
         }
         val progressController=progress?.let { ProgressDemoController(adapter,requireNotNull(trips),requireNotNull(storage),storage,requireNotNull(post),it,clock,scope) }

@@ -176,11 +176,12 @@ class JourneyGameTest {
         var saved = JourneyGameState()
         private val season = Season(JOURNEY_SEASON_ID, "여행", 1, 1000,
             listOf(0, 15, 30, 45, 60), emptyList(), emptyList())
-        fun create() = JourneyGame({ trip }, {
+        fun create(starters: Set<CompanionId> = emptySet()) = JourneyGame({ trip }, {
             ProgressUiState(active = SeasonView(season, SeasonProgress(season.seasonId, emptySet(),
                 totalXp = xp, currentLevel = season.levels.count { it <= xp }),
                 null, false, emptyList(), emptyList()))
-        }, { parked }, { 100 }, saved, { updated -> writable.also { if (it) saved = updated } }, Random(7))
+        }, { parked }, { 100 }, saved, { updated -> writable.also { if (it) saved = updated } }, Random(7),
+            starterCompanions = starters)
 
         fun addCard(place: JourneyPlace) {
             val calendar = CalendarAttributes(CalendarSeason.AUTUMN, CalendarTimeOfDay.DAY, "UTC")
@@ -214,6 +215,20 @@ class JourneyGameTest {
         fixture.trip = fixture.trip.copy(progression = fixture.trip.progression.copy(resetAtEpochMillis = 200))
         assertTrue(reopened.reconcileStorage())
         assertTrue(reopened.state.value.grants.isEmpty())
+    }
+
+    @Test fun demoStarterCompanionsStayEquippableAcrossAProgressReset() = runBlocking {
+        val fixture = Fixture().apply { parked = true }
+        val starters = JourneyPass.TRAVEL.companionIds().toSet()
+        val game = fixture.create(starters)
+        assertEquals(starters, game.state.value.companions)
+        assertTrue(game.equip(starters.first()))
+        assertTrue(game.reconcileStorage())
+        fixture.trip = fixture.trip.copy(progression = fixture.trip.progression.copy(resetAtEpochMillis = 200))
+        assertTrue(game.reconcileStorage())
+        assertEquals(starters, game.state.value.companions)
+        assertNull(game.state.value.equipped)
+        assertTrue(game.equip(starters.last()))
     }
 
     @Test fun legacyGameAdoptsExistingResetMarkerWithoutDeletingEarnedPasses() = runBlocking {

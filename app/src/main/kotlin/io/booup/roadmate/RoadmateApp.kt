@@ -95,7 +95,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
         else viewModel.equipDefaultCompanion(id)
     }
     val canStartTour = canBrowse && !journey.running && context.mode == RuntimeMode.DEMO && screenTour != null
-    val modeLabel = if (previews.isNotEmpty()) "내부 콜라보 시연"
+    val modeLabel = if (previews.isNotEmpty()) "콜라보 예시 시연 · 실제 제휴 아님"
         else simulationLabel ?: "실제 차량 정보 · 읽기 전용"
     val showMap: (JourneyPlace?) -> Unit = { place ->
         mapPlace = place
@@ -195,7 +195,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                         storyAction = true
                         viewModel.journeyAction {
                             try {
-                                storySaveFailed = !completeMoonlightChapter(chapter, answer)
+                                storySaveFailed = !completeMoonlightChapter(chapter, answer).cue(RoadmateSound.REWARD)
                                 if (!storySaveFailed) storyBeat = MoonlightBeat.RESTORED
                             } finally { storyAction = false }
                         }

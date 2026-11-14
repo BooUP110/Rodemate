@@ -41,7 +41,7 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
         val id = gameState?.memories?.firstOrNull { it.tripId == card.sourceTripId }?.companion
         return viewModel.companionPreviews.firstOrNull { it.profile.id == id }
     }
-    LaunchedEffect(detail) { detail?.let { key -> game?.openCard(key.regionId) } }
+    LaunchedEffect(detail) { detail?.let { key -> RoadmateSounds.play(RoadmateSound.POSTCARD); game?.openCard(key.regionId) } }
     val collectedRegions = journeyRegionIds(owned.keys)
     val slots = (state.collection.map { journeyPlace(it.key.regionId) to it } +
         journeyPlaces.filter { it.id !in collectedRegions }.map { it to null }).filter { (_, card) ->
@@ -157,7 +157,7 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
                 postcardCompanion?.let { Text("함께한 동반자 · ${it.profile.displayName}") }
                 if (gameState != null) {
                     val starred = card.key.regionId.value in gameState.starredCards
-                    OutlinedButton(onClick = { viewModel.journeyAction { star(card.key.regionId) } }, enabled = !starred,
+                    OutlinedButton(onClick = { viewModel.journeyAction { star(card.key.regionId).cue(RoadmateSound.REWARD) } }, enabled = !starred,
                         modifier = Modifier.heightIn(min = 52.dp)) { Text(if (starred) "★ 별을 붙였어요" else "☆ 별 스탬프 붙이기") }
                 }
                 if (place != null) TextButton(onClick = { detail = null; openMap(place) }, modifier = Modifier.heightIn(min = 52.dp)) { Text("지도에서 방문지 보기") }
