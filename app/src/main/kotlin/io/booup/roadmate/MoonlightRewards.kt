@@ -139,11 +139,11 @@ internal fun MoonlightWardrobe(state: JourneyGameState, viewModel: RoadmateViewM
                                     val item = selected
                                     save(showEquippedAfter = owned) {
                                         if (owned) equipMoonlightOutfit(item.takeUnless { wearing })
-                                        else claimMoonlightOutfit(item)
+                                        else claimMoonlightOutfit(item).cue(RoadmateSound.REWARD)
                                     }
                                 }, primary = true, enabled = !saving && (owned || claimable))
                                 if (selected.premium && !premium) {
-                                    GameButton("프리미엄 권한 시연", { save { grantDemoMoonlightPremium() } }, enabled = !saving)
+                                    GameButton("프리미엄 권한 시연", { save { grantDemoMoonlightPremium().cue(RoadmateSound.UPGRADE) } }, enabled = !saving)
                                 }
                             }
                             if (saveFailed) Text("변경을 저장하지 못했어요.", color = GameGold, style = RoadmateType.caption)

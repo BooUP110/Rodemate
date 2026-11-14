@@ -1,8 +1,22 @@
 # 검증 요약
 
+최신 통합 검증은 [공모전 시연 보완 통합](MERGE_CONTEST_POLISH.md)과 [검증 JSON](verification/contest-polish-merge.json)을 따른다. main의 반려동물 작업과 개발자 브랜치를 함께 검증했으며, 아래 펫 모드·Phase8.6 단독 실행과 구분한다.
+
+## 2026-11-14 반려동물 모드 추가 검증
+
+- JVM: 기존564개 모두 보존 + 신규29개, 총593개 / 618회. model30 / contracts411 / Demo116 / Production61, 실패·오류·건너뜀0.
+- `:core:model:test :core:contracts:build :app:testDemoDebugUnitTest :app:testProductionDebugUnitTest :app:assembleDemoDebug :app:assembleProductionDebug :app:assembleProductionRelease :app:lintProductionDebug` 실행 성공. 기존 Wrapper/JDK21/오프라인 캐시 사용.
+- 이번 Production offline lint: Error/Fatal0, Warning3 (`OldTargetApi`, `GradleDependency`, `DataExtractionRules` 각1). 이 실행에서 온라인 lint를 새로 수행하지 않았다. 아래 과거 AGP/Phase 경고 개수와 직접 비교하지 않는다.
+- Demo 전체 흐름은 기존 방문 시연으로 만든 **SIMULATED Trip**을 사용했다. 별도 검증 앱 UID에서 프로필 동의, 모드 전환, 기존 시즌 접근, 장소 수정, 엽서 저장/원문 열기, 보상 수령/프레임 적용, 재시작 복원, 원본 Trip 삭제 전파, 펫 데이터 독립 삭제를 확인했다. 원래 앱 데이터는 초기화하지 않았다.
+- Production AVD에서 실제 SDK/AAOS 입력에 따른 정차 등록·암호화 저장/재시작 복원, Drive/30km/h 상세 잠금, Park 복귀를 확인했다. 완료 Trip→펫 엽서 전체 흐름은 이번에 Production에서 새로 재실행하지 않았다.
+- 2560×1440/density160에서 글자1.3배의 동행 수첩·패스를 열고 캡처를 확인했다. 해당 캡처 영역의 텍스트 잘림은 없었다. 더 좁은 창·전체 로터리/스크린리더 접근성은 미검증이다. 확대 설정은1.0으로 복원했다.
+- 최종 Demo·Production debug는 기존 앱에 `adb install -r`로 설치했다. 기존 앱 삭제/데이터 초기화는 하지 않았고 이번 검증용 별도 앱 두 개만 제거했다. APK 해시, 실행 명령과 한계는 [펫 모드 검증 JSON](verification/pet-travel-artifacts.json)을 따른다. 실차·전체 접근성·사용자 인수는 별도다.
+
+아래는 과거 Phase8.6 검증 기록이다.
+
 `main` + `wkdal1433` 병합 후 재검증은 [통합 검토 기록](MERGE_PHASE86_WKDAL.md)에 별도로 기록한다. 아래 Phase 결과를 통합 결과로 재사용하지 않는다.
 
-기준일: 2026-11-10, Phase8.6. 아래 수치는 실제 실행 결과이며 **PHASE8_6_IMPLEMENTATION_COMPLETE / USER_ACCEPTANCE_PENDING / 제출 준비 NOT YET**다. 원시 개발 로그/환경별 수집 자료는 공개 저장소에 포함하지 않는다. [전체 결과](PHASE8_6_ENHANCED_LOCAL_PLATFORM_REPORT.md)와 [검증 JSON](verification/phase8-6-artifacts.json)에 실행별 근거를 기록했다.
+기준일: 2026-11-10, Phase8.6. 아래 수치는 Phase8.6 구현 완료 시점의 실제 실행 결과다. 원시 개발 로그/환경별 수집 자료는 공개 저장소에 포함하지 않는다. [전체 결과](PHASE8_6_ENHANCED_LOCAL_PLATFORM_REPORT.md)와 [검증 JSON](verification/phase8-6-artifacts.json)에 실행별 근거를 기록했다.
 
 ## 빌드와 회귀
 

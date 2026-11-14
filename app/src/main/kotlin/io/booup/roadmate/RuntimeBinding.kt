@@ -35,6 +35,7 @@ data class RuntimeBinding(
     val companionPreviews: List<CompanionPreview> = emptyList(),
     val simulateVisit: (suspend (JourneyPlace) -> Boolean)? = null,
     val journeyGame: JourneyGame? = null,
+    val petTravel: io.booup.roadmate.pet.PetTravelCoordinator? = null,
 ) {
     init { require(presentationTickMillis > 0) }
 }

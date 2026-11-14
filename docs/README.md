@@ -1,15 +1,17 @@
 # 문서 안내
 
-현재 제품을 이해하고 빌드·시연·검수하는 데 필요한 문서입니다. 상태 기준은 Phase8.6 / 2026-11-10이며 **USER_ACCEPTANCE_PENDING**입니다.
+현재 제품을 이해하고 빌드·시연·검수하는 데 필요한 문서입니다. 검증 기준은 Phase8.6 / 2026-11-10이며, 현재 저장소는 공모전 제출본입니다.
 
 | 문서 | 내용 |
 |---|---|
+| [공모전 시연 보완 통합](MERGE_CONTEST_POLISH.md) | 효과음·콜라보 예시·release 구성과 main의 홈·시즌·반려동물 작업 병합 및 검증 |
 | [MVP 범위](MVP_SCOPE.md) | 실제 활성 기능, 비활성·Demo·후속 범위 구분 |
 | [빌드 및 실행](BUILD_AND_RUN.md) | 필요한 버전, Wrapper, JVM 테스트, APK 설치·실행 |
 | [아키텍처](ARCHITECTURE.md) | 모듈, 데이터 흐름, SDK/정책/저장 경계 |
 | [안전 및 개인정보](SAFETY_AND_PRIVACY.md) | 정차 제한, 차량 제어 경계, 동의·보존·삭제 |
 | [검증 요약](VALIDATION_SUMMARY.md) | 실제 실행한 검사 결과와 미검증 범위 |
 | [사용자 검수](USER_ACCEPTANCE_GUIDE.md) | Production/Demo 직접 확인 체크리스트 |
+| [선택형 반려동물 동행](PET_TRAVEL_MODE.md) | 추가 모드·펫 패스·장소 수첩·엽서·메모와 삭제 범위 |
 | [시연 동선](SUBMISSION_DEMO_FLOW.md) | 실제 차량 읽기와 합성 시연을 구분하는 진행 순서 |
 | [현재 구현 상태](IMPLEMENTATION_STATUS.md) | 네 회복 영역의 구현/검증/미구현 구분 |
 | [단계와 완료 기준](DEVELOPMENT_PHASES.md) | 보안 선행 Gate와 후속 작업 조건 |

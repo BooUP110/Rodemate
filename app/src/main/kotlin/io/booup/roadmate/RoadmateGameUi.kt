@@ -22,7 +22,8 @@ internal val GameMist = Color(0xFFBDD1CE)
 @Composable
 internal fun GameButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     primary: Boolean = false, enabled: Boolean = true) {
-    Button(onClick, modifier.heightIn(min = 48.dp), enabled = enabled, shape = RoundedCornerShape(10.dp),
+    Button({ RoadmateSounds.play(RoadmateSound.TAP); onClick() }, modifier.heightIn(min = 48.dp), enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, GameGold.copy(alpha = if (primary) .92f else .44f)),
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
         colors = ButtonDefaults.buttonColors(

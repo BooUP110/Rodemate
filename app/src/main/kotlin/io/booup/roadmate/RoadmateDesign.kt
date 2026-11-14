@@ -227,7 +227,7 @@ internal fun RowScope.RoadmateDockItem(title: String, symbol: String, selected: 
     }
     Column(Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
         .background(if (selected) GameGold else Color.Transparent)
-        .selectable(selected, enabled = enabled, role = Role.Tab, onClick = onClick)
+        .selectable(selected, enabled = enabled, role = Role.Tab, onClick = { RoadmateSounds.play(RoadmateSound.TAP); onClick() })
         .heightIn(min = 64.dp).padding(horizontal = 4.dp, vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text(symbol, Modifier.clearAndSetSemantics {}, color = if (selected) GameInk else GameGold.copy(alpha = .8f),

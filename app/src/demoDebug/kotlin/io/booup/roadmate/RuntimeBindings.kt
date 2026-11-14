@@ -75,14 +75,17 @@ object RuntimeBindings {
             initialSeasons = listOf(journeySeason(previews.firstOrNull())),
             catalog = if (previews.isEmpty() && tourStorage == null) ProgressDemoScenarios.catalog else null,
             seedOnlyWhenEmpty = true, fillDemoSeasonGap = tourStorage == null) }
+        // Contest demo: the Chiikawa trip companions start unlocked whenever their local art is installed.
+        val starters = JourneyPass.TRAVEL.companionIds().filter { id -> previews.any { it.profile.id == id } }.toSet()
         val game = when {
             tourStorage != null && progress != null -> JourneyGame(
                 storage = { tourStorage.state.value }, progress = { progress.uiState.value },
                 controlsAllowed = requireNotNull(post)::controlsAllowed, now = { clock.now().epochMillis },
                 initial = JourneyGameState(),
                 persist = { true }, passes = if (previews.isEmpty()) listOf(JourneyPass.COAST, JourneyPass.STARS) else JourneyPass.entries,
+                starterCompanions = starters,
             )
-            journey != null && appContext != null && progress != null -> localJourneyGame(appContext, progress, post, clock)
+            journey != null && appContext != null && progress != null -> localJourneyGame(appContext, progress, post, clock, starters)
             else -> null
         }
         val progressController=progress?.let { ProgressDemoController(adapter,requireNotNull(trips),requireNotNull(storage),storage,requireNotNull(post),it,clock,scope) }
@@ -112,6 +115,10 @@ object RuntimeBindings {
                 }
             } else null,
             journeyGame = game,
+            petTravel = if(tourStorage==null && trips!=null && storageRoot!=null) io.booup.roadmate.pet.PetTravelCoordinator(
+                io.booup.roadmate.storage.FilePetTravelRepository(File(storageRoot,"roadmate-demo/pet"),
+                    RuntimeMode.DEMO,requireNotNull(encryption)),RuntimeMode.DEMO,clock,
+                { repository.context.value },{ trips.uiState.value },{ UUID.randomUUID().toString() }) else null,
         )
     }
 }

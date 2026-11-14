@@ -105,7 +105,8 @@ internal fun WorldTitle(text: String, color: Color, modifier: Modifier = Modifie
 @Composable
 internal fun WorldAction(label: String, world: JourneyWorld, onClick: () -> Unit,
     modifier: Modifier = Modifier, primary: Boolean = true, enabled: Boolean = true) {
-    Button(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 48.dp),
+    Button(onClick = { RoadmateSounds.play(RoadmateSound.TAP); onClick() }, enabled = enabled,
+        modifier = modifier.heightIn(min = 48.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(containerColor = if (primary) world.accent else world.paper,
             contentColor = if (primary) Color.White else world.deep),

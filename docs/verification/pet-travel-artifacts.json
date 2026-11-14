@@ -1,0 +1,261 @@
+{
+  "feature": "Optional pet travel mode",
+  "date": "2026-11-14",
+  "base_head": "4fbd3e849450e8e56fa9b0e72c13786d78aaab91",
+  "user_acceptance": "PENDING",
+  "environment": {
+    "gradle": "8.13",
+    "agp": "8.13.2",
+    "kotlin": "2.0.0",
+    "jdk": "21.0.4",
+    "compile_target_sdk": 35,
+    "min_sdk": 28,
+    "avd": "Pleos Connect 2.1.0 / API34",
+    "display": "2560x1440 / density160"
+  },
+  "tests": {
+    "unique": 593,
+    "executions": 618,
+    "modules": {
+      "model": 30,
+      "contracts": 411,
+      "demo": 116,
+      "production": 61
+    },
+    "faults": [],
+    "baseline_unique": 564,
+    "missing_baseline": [],
+    "new_unique": 29
+  },
+  "lint": {
+    "severities": {
+      "Warning": 3
+    },
+    "issues": {
+      "OldTargetApi": 1,
+      "GradleDependency": 1,
+      "DataExtractionRules": 1
+    },
+    "mode": "offline",
+    "online_rerun": false
+  },
+  "build": {
+    "result": "PASS",
+    "tasks": [
+      ":core:model:test",
+      ":core:contracts:build",
+      ":app:testDemoDebugUnitTest",
+      ":app:testProductionDebugUnitTest",
+      ":app:assembleDemoDebug",
+      ":app:assembleProductionDebug",
+      ":app:assembleProductionRelease",
+      ":app:lintProductionDebug"
+    ],
+    "command": ".\\gradlew.bat --gradle-user-home .gradle-user-home --console=plain --offline --no-daemon --max-workers=2 \"-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=COMPAT\" -Pandroid.overridePathCheck=true <tasks>",
+    "elapsed": "3m31s",
+    "release": "unsigned; not a signed submission artifact"
+  },
+  "avd": {
+    "demo": {
+      "result": "PASS",
+      "cases": {
+        "profile-explicit-consent": {
+          "status": "PASS",
+          "evidence": "real UI name/consent save in isolated app"
+        },
+        "pet-pass-claims": {
+          "status": "PASS",
+          "evidence": "welcome and memo rewards received; star frame applied"
+        },
+        "existing-pass-accessible": {
+          "status": "PASS",
+          "evidence": "existing season remains accessible from pet pass"
+        },
+        "normal-mode-preserved": {
+          "status": "PASS",
+          "evidence": "original home/map intact, pet panel hidden when mode off"
+        },
+        "owner-place-crud": {
+          "status": "PASS",
+          "evidence": "real personal-place create/edit; explicitly no verified admission/visit claim"
+        },
+        "trip-to-pet-card": {
+          "status": "PASS",
+          "evidence": "new simulated Trip through existing map journey, explicit owner card save"
+        },
+        "card-explicit-open-and-encryption": {
+          "status": "PASS",
+          "evidence": "owner note hidden until open; actual ciphertext scan no fixed plaintext"
+        },
+        "card-frame-real-application": {
+          "status": "PASS",
+          "evidence": "Trip reward claimed, paw frame changes actual card"
+        },
+        "process-reopen": {
+          "status": "PASS",
+          "evidence": "profile, mode, actual card, selected frame, notes restored"
+        },
+        "parent-delete-propagates": {
+          "status": "PASS",
+          "evidence": "original Trip delete removes linked pet card/reminder; independent preparation remains"
+        },
+        "pet-delete-only": {
+          "status": "PASS",
+          "evidence": "own consent withdrawal/delete, original encrypted Trip/XP aggregate bytes identical"
+        }
+      },
+      "trip_source": "SIMULATED; existing DemoJourney path",
+      "moving_gate": "positive parked-only message captured, private pet content absent"
+    },
+    "production": {
+      "result": "PASS",
+      "cases": {
+        "production-parked-profile": {
+          "status": "PASS",
+          "evidence": "actual Pleos/AAOS parked sources permit owner registration and reminder"
+        },
+        "production-reopen": {
+          "status": "PASS",
+          "evidence": "force-stop/relaunch restores own encrypted pet profile and reminder"
+        },
+        "production-motion-lock": {
+          "status": "PASS",
+          "evidence": "official Console Drive/30 closes pet details; no profile/action exposed"
+        },
+        "production-parked-recovery": {
+          "status": "PASS",
+          "evidence": "actual SDK/UX policy recovery restores parked content"
+        },
+        "font130-smoke": {
+          "status": "PASS",
+          "evidence": "font1.3 hub and pass opened at 2560x1440/density160; screenshots visually inspected, no visible text clipping in captured sections"
+        }
+      },
+      "trip_e2e": "not rerun on Production in this change; actual new Trip/card linkage exercised in Demo and ViewModel unit tests"
+    },
+    "method": "Same product sources under opt-in isolated acceptance app IDs; self-targeted ordinary UI observer; real UI/IME actions; official emulator Console motion controls; original app data not cleared",
+    "acceptance_build_flag": "-Pphase86IsolatedAcceptance",
+    "ui_driver_retries": "Final results only; earlier navigation/default-package/wait failures retained privately and corrected; no product bypass"
+  },
+  "storage": {
+    "local_only": true,
+    "independent_pet_consent": true,
+    "envelope": "existing AES256-GCM envelope1",
+    "pet_schema": 1,
+    "existing_trip_schema_changed": false,
+    "actual_demo_ciphertext": {
+      "envelope": true,
+      "bytes": 450,
+      "sha256": "fdd585d3c4c74b39af325e40a1dc354e88386a3b066b2f4e11e42e73c797354c",
+      "fixed_owner_text_found": false,
+      "raw_bytes_published": false
+    },
+    "actual_production_ciphertext": {
+      "envelope": true,
+      "bytes": 190,
+      "sha256": "e25e3638a87c849b0395ce312fbcc1cf2fd984a75d52c92381b12407107ea895",
+      "fixed_name_plaintext": false
+    },
+    "original_aggregate_unchanged_on_pet_delete": "PASS",
+    "raw_owner_notes_published": false
+  },
+  "preservation": {
+    "protected_source_files": 17,
+    "protected_source_sha256_unchanged": true,
+    "new_permissions": false,
+    "new_dependencies": false,
+    "xp_policy_changes": false,
+    "new_vehicle_control": false,
+    "git_staged_files": 0,
+    "git_head_unchanged": true
+  },
+  "artifacts": {
+    "demo": {
+      "path": "app/build/outputs/apk/demo/debug/app-demo-debug.apk",
+      "sha256": "7759c1e324afcc2310161830ef449f53c725a410b6e9dfedc2be2624aa87f8dc",
+      "bytes": 90860903,
+      "permissions": [
+        "package: io.booup.roadmate.demo",
+        "permission: io.booup.roadmate.demo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+        "uses-permission: name='io.booup.roadmate.demo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'"
+      ],
+      "package": "package: name='io.booup.roadmate.demo' versionCode='1' versionName='0.7.0-phase7-demo' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'",
+      "forbidden_markers": [],
+      "signed": true
+    },
+    "production": {
+      "path": "app/build/outputs/apk/production/debug/app-production-debug.apk",
+      "sha256": "5dd62c9c825b445eb498aa27b960af539f5faf00e96be0a06ab328b13bee4030",
+      "bytes": 92779424,
+      "permissions": [
+        "package: io.booup.roadmate",
+        "uses-permission: name='android.car.permission.CAR_SPEED'",
+        "uses-permission: name='android.car.permission.CAR_POWERTRAIN'",
+        "uses-permission: name='android.car.permission.CAR_EXTERIOR_ENVIRONMENT'",
+        "uses-permission: name='pleos.car.permission.CAR_LIGHTS'",
+        "uses-permission: name='pleos.car.permission.CAR_DRIVE'",
+        "uses-permission: name='pleos.car.permission.CAR_SAFETY'",
+        "uses-permission: name='pleos.car.permission.CAR_CLIMATE'",
+        "uses-permission: name='ai.pleos.playground.service.vehicle.VEHICLE_BINDING'",
+        "permission: io.booup.roadmate.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+        "uses-permission: name='io.booup.roadmate.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'"
+      ],
+      "package": "package: name='io.booup.roadmate' versionCode='1' versionName='0.7.0-phase7' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'",
+      "forbidden_markers": [],
+      "signed": true
+    },
+    "release": {
+      "path": "app/build/outputs/apk/production/release/app-production-release-unsigned.apk",
+      "sha256": "d2662e2165d676453dbe3bf3f410272be2848a31665632827edd211357d894cb",
+      "bytes": 85738552,
+      "permissions": [
+        "package: io.booup.roadmate",
+        "uses-permission: name='android.car.permission.CAR_SPEED'",
+        "uses-permission: name='android.car.permission.CAR_POWERTRAIN'",
+        "uses-permission: name='android.car.permission.CAR_EXTERIOR_ENVIRONMENT'",
+        "uses-permission: name='pleos.car.permission.CAR_LIGHTS'",
+        "uses-permission: name='pleos.car.permission.CAR_DRIVE'",
+        "uses-permission: name='pleos.car.permission.CAR_SAFETY'",
+        "uses-permission: name='pleos.car.permission.CAR_CLIMATE'",
+        "uses-permission: name='ai.pleos.playground.service.vehicle.VEHICLE_BINDING'",
+        "permission: io.booup.roadmate.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+        "uses-permission: name='io.booup.roadmate.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'"
+      ],
+      "package": "package: name='io.booup.roadmate' versionCode='1' versionName='0.7.0-phase7' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'",
+      "forbidden_markers": [],
+      "signed": false
+    }
+  },
+  "limits": [
+    "Single pet profile",
+    "No verified pet-friendly POI, automatic arrival or location provider",
+    "No animal health, temperature, occupancy or unattended-pet detection",
+    "No vehicle control, payments, new XP policy or external service",
+    "No physical-car, complete accessibility/rotary or narrower-window validation",
+    "User acceptance, final privacy wording and distribution policy approval remain pending",
+    "Parent deletion and pet cleanup are separate encrypted transactions; failed cleanup hides content and retries against current parent data"
+  ],
+  "evidence_location": "Raw logs, screenshots, synthetic form inputs and development scripts are local-only under ignored development/pet-mode/",
+  "installation": {
+    "io.booup.roadmate": {
+      "install_replace": "Performing Streamed Install\r\nSuccess",
+      "data_clear": false,
+      "uninstall": false
+    },
+    "io.booup.roadmate.demo": {
+      "install_replace": "Performing Streamed Install\r\nSuccess",
+      "data_clear": false,
+      "uninstall": false
+    },
+    "io.booup.roadmate.acceptance": {
+      "isolated_test_cleanup": "Success"
+    },
+    "io.booup.roadmate.acceptance.demo": {
+      "isolated_test_cleanup": "Success"
+    },
+    "settings": {
+      "font_scale": "1.0",
+      "density": "Physical density: 160"
+    }
+  }
+}

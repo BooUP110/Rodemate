@@ -48,6 +48,8 @@ SafeProgressEngine은 저장된 사실과 고정 정책으로 원장·레벨·�
 
 ## 저장과 실행 변형
 
+선택형 반려동물 동행은 `PetTravelCoordinator`가 기존 VehicleContext/완료 Trip을 읽고, `PetTravelRepository`의 독립 암호화 sidecar에 보호자가 명시한 프로필·메모·펫 엽서·꾸미기 보상을 저장한다. ViewModel/StateFlow를 통해 기존 메뉴에 추가하며, 일반 모드·기존 시즌·XP 원장으로 쓰기를 역류시키지 않는다. 물리 정차와 UX freshness를 사용자 작업 시 다시 확인하고 원본 삭제를 연결 데이터에 전파한다. [상세 계약](PET_TRAVEL_MODE.md).
+
 현재 저장은 Room/외부 DB 없이 앱 전용 noBackupFilesDir 아래 FileTripRepository를 사용한다. Android Keystore + AES256-GCM envelope1로 보호하고 도메인 schema1/2/3 읽기 호환·schema4 쓰기와 실제 golden fixture를 유지한다. schema4의 명시 선호는 암호화 metadata와 별개다. [저장 보안](PHASE8_6_STORAGE_SECURITY.md)과 [migration](PHASE8_6_STORAGE_MIGRATION.md), [삭제·동의 정책](SAFETY_AND_PRIVACY.md)을 따른다.
 
 ## Phase8.6의 독립 로컬 기능

@@ -86,13 +86,15 @@ Pleos AVD를 정차 상태로 두고 별도 검증 APK에서 위치 응답 형�
 
 시즌 화면의 일러스트는 로컬 `development/collab-preview/assets/pass-worlds/`에 `travel.jpg`, `stars.jpg`, `coast.jpg`, `post.jpg`로 둔다. 해당 이미지가 없는 빌드는 테마별 그라데이션 배경을 사용한다.
 
+잠긴 콜라보 패스(짱구, 이름을 가린 다음 콜라보)는 수령·장착 없이 미리보기만 열린다. 그림은 `pass-worlds/<키>.jpg`(가로 포스터), `pass-worlds/<키>-poster.jpg`(세로 포스터), `companion-previews/<캐릭터>-idle.png`(치이카와와 같은 2×2 대기 시트)로 둔다. 짱구 키는 `shinchan`, 캐릭터 파일 이름은 `app/src/main/kotlin/io/booup/roadmate/UpcomingCollabs.kt`의 목록(`shinchan`·`cheolsu`·`yuri`·`maenggu`·`hooni`)을 따른다. 다음 콜라보(`mystery`)는 협력사 이름과 그림 없이 그라데이션 배경과 "???" 실루엣으로만 표시한다.
+
 ~~~powershell
 .\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:mergeDemoDebugAssets --rerun :app:packageInternalCollab
 ~~~
 
 내부 APK는 `development/collab-preview/apk/roadmate-collab-debug.apk`에 복사되고 앱 ID는 `io.booup.roadmate.demo.collab`이다. 로컬 `development/`는 Git 제외 경로다. 내부 이미지가 담긴 APK는 가상 콜라보 시연용으로 관리한다. 협업 저장소의 내부 시연 사전 릴리스에서 `roadmate-collab-debug.apk`를 바로 설치할 수 있다. Android Studio에서 빌드하려면 `roadmate-collab-assets.zip`을 `development/collab-preview/`에 풀어 기존 `assets/` 경로와 합친다.
 
-Android Studio에서 `C:/Users/scspr/WorkSpace/Rodemate`를 프로젝트로 열고 `demoDebug`로 기본 Run을 누르면 **카펫**(`io.booup.roadmate.demo`)이 실행된다. 정차 시 동행 홈 전체에 풍경과 캐릭터가 펼쳐진다. `차량 상태`에서 차량 정보를 열고, `강릉 이야기`에서 오리지널 동행과 함께 장소별 일러스트를 본다. 하단의 `시즌 패스`에서 보상과 무료·프리미엄 진행도를 확인한다. `roadmateInternalCollabs`를 지정한 빌드도 **카펫**(`io.booup.roadmate.demo.collab`)으로 표시되며 홈에 `내부 콜라보 시연` 배지가 붙는다. 이 빌드는 로컬 시연 캐릭터와 콜라보 시즌 화면을 포함한다. 두 앱은 각각의 저장 데이터를 사용한다.
+Android Studio에서 프로젝트 루트를 열고 `demoDebug`로 기본 Run을 누르면 **카펫**(`io.booup.roadmate.demo`)이 실행된다. 정차 시 동행 홈 전체에 풍경과 캐릭터가 펼쳐진다. `차량 상태`에서 차량 정보를 열고, `강릉 이야기`에서 오리지널 동행과 함께 장소별 일러스트를 본다. 하단의 `시즌`에서 보상과 무료·프리미엄 진행도를 확인한다. `roadmateInternalCollabs`를 지정하고 로컬 카탈로그·이미지를 넣은 빌드도 **카펫**(`io.booup.roadmate.demo.collab`)으로 표시되며 홈에 `콜라보 예시 시연 · 실제 제휴 아님` 배지가 붙는다. 이 빌드는 로컬 시연 캐릭터와 콜라보 시즌 화면을 포함한다. 두 앱은 각각의 저장 데이터를 사용한다.
 
 콜라보 캐릭터와 함께 플레이하려면 에뮬레이터를 켜고 위에서 만든 내부 APK를 에뮬레이터 화면에 끌어다 놓는다. 프로젝트에서 바로 빌드하고 설치하려면 Android Studio 터미널에서 다음 명령을 실행한다.
 
@@ -100,7 +102,7 @@ Android Studio에서 `C:/Users/scspr/WorkSpace/Rodemate`를 프로젝트로 열�
 .\gradlew.bat --project-cache-dir .gradle/collab-preview -ProadmateInternalCollabs :app:mergeDemoDebugAssets --rerun :app:installDemoDebug
 ~~~
 
-설치 후 **카펫**을 열고 홈의 `내부 콜라보 시연` 배지를 확인한다. `강릉 이야기 → 이야기 시작`을 선택한다. 이미 완주한 경우 `처음부터`를 선택한다.
+설치 후 **카펫**을 열고 홈의 `콜라보 예시 시연 · 실제 제휴 아님` 배지를 확인한다. `강릉 이야기 → 이야기 시작`을 선택한다. 이미 완주한 경우 `처음부터`를 선택한다.
 
 ### 탐험 지도와 엽서 시연
 

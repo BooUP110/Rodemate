@@ -52,7 +52,10 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
     val active = ui.active
     val upgraded = active?.progress?.premiumEntitled == true
     val upgrade: (() -> Unit)? = active?.takeIf { !upgraded && ui.contentAllowed && viewModel.canSimulateVisit }?.let { season ->
-        { viewModel.progressAction { it.previewPremium(season.season.seasonId, true) } }
+        { viewModel.progressAction {
+            it.previewPremium(season.season.seasonId, true)
+            (it.uiState.value.active?.progress?.premiumEntitled == true).cue(RoadmateSound.UPGRADE)
+        } }
     }
     val showReward: (SeasonView, RewardView) -> Unit = { season, item ->
         selected = season.season.seasonId to item.reward.rewardId
@@ -162,7 +165,7 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
         if (item != null) RewardDialog(item, preview, viewModel, season.season.levels[item.reward.level - 1], season.opensWithUpgrade(item),
             upgrade.takeIf { season == active && item.reward.track == RewardTrack.PREMIUM && item.state == RewardClaimState.LOCKED },
             dismiss = { selected = null }) {
-            viewModel.progressAction { it.claim(seasonId, rewardId) }
+            viewModel.progressAction { it.claim(seasonId, rewardId).cue(RoadmateSound.REWARD) }
         }
     }
 }

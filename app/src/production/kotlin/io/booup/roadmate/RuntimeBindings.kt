@@ -92,6 +92,10 @@ object RuntimeBindings {
         comfort=storage?.let { io.booup.roadmate.local.ComfortCoordinator(it,RuntimeMode.PRODUCTION,clock,{context.context.value}) },
         progress=post?.let { io.booup.roadmate.progress.ProgressCoordinator(requireNotNull(storage),RuntimeMode.PRODUCTION,clock,{it.controlsAllowed()},
             listOf(io.booup.roadmate.progress.LocalSeasonCatalog.first)) },
+        petTravel=trips?.let { trip -> io.booup.roadmate.pet.PetTravelCoordinator(
+            io.booup.roadmate.storage.FilePetTravelRepository(File(requireNotNull(storageRoot), "roadmate-production/pet"),
+                RuntimeMode.PRODUCTION,requireNotNull(encryption)),RuntimeMode.PRODUCTION,clock,
+            { context.context.value },{ trip.uiState.value },{ UUID.randomUUID().toString() }) },
     )
     }
 }

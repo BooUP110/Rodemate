@@ -29,6 +29,9 @@ private enum class RoadmatePage(val label: String, val symbol: String, val art: 
     MEMORY("드라이브 기억", "↗", "drive-memory.png", artIndex = 2),
     SETTINGS("설정", "⚙", "home-parked.png", "나의 동행 설정"),
     DEMO("시연 선택", "▷", "home-parked.png", "함께 체험할 이야기"),
+    PET("반려동물 동행", "♡", "home-parked.png", "우리 아이와 함께"),
+    PET_PLACES("우리 아이 장소 수첩", "◇", "map-gangneung.png", artIndex=1),
+    PET_CARDS("함께한 펫 엽서", "✉", "drive-memory.png", artIndex=2),
 }
 
 internal enum class TourStop(val label: String) {
@@ -47,6 +50,8 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     val care by viewModel.uiState.collectAsStateWithLifecycle()
     val journey by viewModel.journey.collectAsStateWithLifecycle()
     val progress by viewModel.progressUiState.collectAsStateWithLifecycle()
+    val pet by viewModel.petTravelUiState.collectAsStateWithLifecycle()
+    val petEnabled=pet.contentAllowed && pet.data.enabled
     val game = viewModel.journeyGame
     val gameState = game?.state?.collectAsStateWithLifecycle()?.value
     val previews = viewModel.companionPreviews
@@ -63,6 +68,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     var rosterOpen by rememberSaveable { mutableStateOf(false) }
     var wardrobeOpen by rememberSaveable { mutableStateOf(false) }
     var moreOpen by rememberSaveable { mutableStateOf(false) }
+    var petPassSelected by rememberSaveable { mutableStateOf(true) }
     var returnToMap by remember { mutableStateOf(false) }
     var mapPlace by remember { mutableStateOf<JourneyPlace?>(null) }
     var expedition by remember { mutableStateOf(if (tourStop == TourStop.MAP) Expedition.GANGNEUNG else Expedition.SEOUL) }
@@ -96,7 +102,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
         else viewModel.equipDefaultCompanion(id)
     }
     val canStartTour = canBrowse && !journey.running && context.mode == RuntimeMode.DEMO && screenTour != null
-    val modeLabel = if (previews.isNotEmpty()) "내부 콜라보 시연"
+    val modeLabel = if (previews.isNotEmpty()) "콜라보 예시 시연 · 실제 제휴 아님"
         else simulationLabel ?: "실제 차량 정보 · 읽기 전용"
     val showMap: (JourneyPlace?) -> Unit = { place ->
         mapPlace = place
@@ -109,6 +115,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
         if (target == RoadmatePage.MAP && (page != RoadmatePage.MAP || mapPlace != null)) showMap(null)
         albumStoryCompanion = null
         if (target == RoadmatePage.COLLECTION) albumPlace = null
+        if (target == RoadmatePage.SEASON) petPassSelected = true
         page = target
     }
     val navigation: @Composable () -> Unit = {
@@ -118,7 +125,8 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                 RoadmateDockItem(label, target.symbol, selected = page == target,
                     enabled = canBrowse || target in setOf(RoadmatePage.HOME, RoadmatePage.DEMO)) { navigate(target) }
             }
-            RoadmateDockItem("더보기", "☰", selected = page in setOf(RoadmatePage.MEMORY, RoadmatePage.SETTINGS, RoadmatePage.DEMO),
+            RoadmateDockItem("더보기", "☰", selected = page in setOf(RoadmatePage.MEMORY, RoadmatePage.SETTINGS, RoadmatePage.DEMO,
+                RoadmatePage.PET,RoadmatePage.PET_PLACES,RoadmatePage.PET_CARDS),
                 enabled = canBrowse || (full && demoControls != null)) { moreOpen = true }
         }
     }
@@ -158,13 +166,14 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     }
     BackHandler(storyOpen && canBrowse && !storyVisit && !storyAction) { storyOpen = false }
     BackHandler(!storyOpen && !rosterOpen && !wardrobeOpen && !moreOpen && page != RoadmatePage.HOME && tourStop == null) {
-        navigate(RoadmatePage.HOME)
+        navigate(if(page in setOf(RoadmatePage.PET_PLACES,RoadmatePage.PET_CARDS)) RoadmatePage.PET else RoadmatePage.HOME)
     }
     RoadmateTheme {
         if (moreOpen && full) AlertDialog(onDismissRequest = { moreOpen = false },
             title = { Text("더보기") }, text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(RoadmatePage.MEMORY, RoadmatePage.SETTINGS, RoadmatePage.DEMO)
+                    (listOf(RoadmatePage.MEMORY, RoadmatePage.SETTINGS, RoadmatePage.DEMO)+
+                        if(viewModel.petTravel!=null) listOf(RoadmatePage.PET) else emptyList())
                         .filter { it != RoadmatePage.DEMO || demoControls != null }.forEach { target ->
                             GameButton(target.label, { moreOpen = false; navigate(target) },
                                 Modifier.fillMaxWidth(), enabled = canBrowse || target == RoadmatePage.DEMO)
@@ -212,7 +221,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                         storyAction = true
                         viewModel.journeyAction {
                             try {
-                                storySaveFailed = !completeMoonlightChapter(chapter, answer)
+                                storySaveFailed = !completeMoonlightChapter(chapter, answer).cue(RoadmateSound.REWARD)
                                 if (!storySaveFailed) storyBeat = MoonlightBeat.RESTORED
                             } finally { storyAction = false }
                         }
@@ -252,6 +261,8 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                     vehicleStatus = "정차 · ${UiCopy.connection(context.connection.status)}",
                     historyEnabled = post.historyEnabled,
                     availableRewards = progress.active?.rewards?.count { it.state == RewardClaimState.AVAILABLE } ?: 0,
+                    petName = pet.data.profile?.name.takeIf { petEnabled },
+                    openPet = if(viewModel.petTravel!=null) { {navigate(RoadmatePage.PET)} } else null,
                     openWardrobe = if (gameState != null && trial == null) { { wardrobeOpen = true } } else null,
                     endTrial = if (trial == null) null else { { homeTrial = null } },
                     navigation = navigation, priorityCare = priorityCare) {
@@ -261,6 +272,12 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                         navigate(RoadmatePage.MEMORY)
                     })
                     if (!post.historyEnabled) GameButton("기록 저장 설정", { navigate(RoadmatePage.SETTINGS) })
+                }
+                return@Scaffold
+            }
+            if(page==RoadmatePage.SEASON && canBrowse && petEnabled && petPassSelected) {
+                RoadmateChapter("첫 차 나들이 패스","map-gangneung.png",1,modeLabel,insets,navigation,priorityCare) {
+                    PetPassContent(viewModel,{navigate(RoadmatePage.PET)},{navigate(RoadmatePage.PET_CARDS)},{petPassSelected=false})
                 }
                 return@Scaffold
             }
@@ -301,21 +318,35 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                                 }
                                 demoControls?.invoke()
                             }
-                            RoadmatePage.MEMORY -> PostDriveContent(viewModel,
+                            RoadmatePage.MEMORY -> {
+                                PetTravelEntry(viewModel,"동행 수첩","지난 경험을 다음 출발의 준비로 이어가요.") {navigate(RoadmatePage.PET)}
+                                PostDriveContent(viewModel,
                                 openAlbum = { albumStoryCompanion = null; albumPlace = it; page = RoadmatePage.COLLECTION },
                                 openMap = showMap,
-                                openSeason = { page = RoadmatePage.SEASON }, showHeader = false)
-                            RoadmatePage.MAP -> ExplorationContent(viewModel, context,
+                                openSeason = { navigate(RoadmatePage.SEASON) }, showHeader = false)
+                            }
+                            RoadmatePage.MAP -> {
+                                PetTravelEntry(viewModel,"우리 아이 장소 수첩","직접 남긴 장소와 다음 방문 메모를 확인해요.") {navigate(RoadmatePage.PET_PLACES)}
+                                ExplorationContent(viewModel, context,
                                 initialPlace = mapPlace, route = expedition, onRouteChange = { expedition = it },
                                 openCollection = { albumStoryCompanion = null; albumPlace = it; page = RoadmatePage.COLLECTION },
                                 openMemory = { page = RoadmatePage.MEMORY }, openSeason = { page = RoadmatePage.SEASON },
                                 onSimulate = { place -> viewModel.simulateVisit(place); returnToMap = true })
-                            RoadmatePage.COLLECTION -> CollectionContent(viewModel, activePreview, albumPlace, showMap,
-                                storyCompanion = albumStoryCompanion)
+                            }
+                            RoadmatePage.COLLECTION -> {
+                                PetTravelEntry(viewModel,"함께한 펫 엽서","${pet.cards.size}장의 동행 기록을 우리 아이의 프레임으로 간직해요.") {navigate(RoadmatePage.PET_CARDS)}
+                                CollectionContent(viewModel, activePreview, albumPlace, showMap,storyCompanion = albumStoryCompanion)
+                            }
+                            RoadmatePage.PET -> PetTravelHub(viewModel,{navigate(RoadmatePage.SEASON)},
+                                {navigate(RoadmatePage.PET_PLACES)},{navigate(RoadmatePage.PET_CARDS)},
+                                {navigate(RoadmatePage.MAP)},{navigate(RoadmatePage.SETTINGS)})
+                            RoadmatePage.PET_PLACES -> PetPlacesContent(viewModel) {navigate(RoadmatePage.PET)}
+                            RoadmatePage.PET_CARDS -> PetCardsContent(viewModel) {navigate(RoadmatePage.PET)}
                             RoadmatePage.SETTINGS -> {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     GameButton("동행 선택", { rosterOpen = true })
                                     if (gameState != null) GameButton("옷장", { wardrobeOpen = true })
+                                    if(viewModel.petTravel!=null) GameButton("반려동물 동행 설정",{navigate(RoadmatePage.PET)})
                                 }
                                 RecordSettingsContent(viewModel)
                             }

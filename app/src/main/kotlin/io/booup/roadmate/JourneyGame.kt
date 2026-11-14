@@ -60,9 +60,11 @@ class JourneyGame(private val storage: () -> TripStorageState,
     private val progress: () -> ProgressUiState, private val controlsAllowed: () -> Boolean,
     private val now: () -> Long, initial: JourneyGameState, private val persist: suspend (JourneyGameState) -> Boolean,
     private val random: Random = Random.Default,
-    internal val passes: List<JourneyPass> = JourneyPass.entries) {
+    internal val passes: List<JourneyPass> = JourneyPass.entries,
+    /** Demo-only companions that stay unlocked from launch and survive progress resets. */
+    private val starterCompanions: Set<CompanionId> = emptySet()) {
     private val mutex = Mutex()
-    private val data = MutableStateFlow(initial)
+    private val data = MutableStateFlow(initial.copy(companions = initial.companions + starterCompanions))
     val state = data.asStateFlow()
 
     fun visibleMemories(current: JourneyGameState = data.value): List<JourneyMemory> {
@@ -79,7 +81,8 @@ class JourneyGame(private val storage: () -> TripStorageState,
         val current = data.value
         val resetAt = stored.progression.resetAtEpochMillis
         val owned = ownedCards().map { it.value }.toSet()
-        val next = if (current.progressResetAt >= 0 && current.progressResetAt != resetAt) JourneyGameState(progressResetAt = resetAt)
+        val next = if (current.progressResetAt >= 0 && current.progressResetAt != resetAt)
+            JourneyGameState(progressResetAt = resetAt, companions = starterCompanions)
         else current.copy(
             progressResetAt = resetAt,
             memories = visibleMemories(current),

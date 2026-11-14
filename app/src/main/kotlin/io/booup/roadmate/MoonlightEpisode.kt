@@ -159,7 +159,7 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
             verticalArrangement = Arrangement.spacedBy(9.dp)) {
             when (beat) {
                 MoonlightBeat.COVER -> {
-                    Text(if (cast.isEmpty()) "강릉 이야기" else "치이카와 강릉 패스 · 내부 시연",
+                    Text(if (cast.isEmpty()) "강릉 이야기" else "치이카와 강릉 패스 · 콜라보 예시",
                         color = MoonlightGold, style = MaterialTheme.typography.labelLarge)
                     Text("사라진 달빛 엽서", color = Color.White,
                         style = RoadmateType.heading.copy(fontSize = if (wide) 49.sp else 35.sp,

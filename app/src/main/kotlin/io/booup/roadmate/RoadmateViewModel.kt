@@ -19,6 +19,8 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     val developerPanel = binding.developerPanel
     val companionPreviews = binding.companionPreviews
     val journeyGame = binding.journeyGame
+    val petTravel = binding.petTravel
+    val petTravelUiState = petTravel?.uiState ?: MutableStateFlow(PetTravelUiState()).asStateFlow()
     val canSimulateVisit = binding.simulateVisit != null
     private val mutableJourney = MutableStateFlow(JourneyVisitUi())
     val journey = mutableJourney.asStateFlow()
@@ -66,6 +68,8 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     private val mutableCareDecision = MutableStateFlow(CareDecision())
     val careDecision = mutableCareDecision.asStateFlow()
     init {
+        petTravel?.let { pet -> viewModelScope.launch { pet.initialize() } }
+        petTravel?.let { pet -> viewModelScope.launch { tripUiState.collect { pet.refresh() } } }
         viewModelScope.launch { state.collect { refreshLocalExperience() } }
         trips?.let { trip -> viewModelScope.launch { trip.repository.state.collect { refreshLocalExperience() } } }
         trips?.let { trip -> viewModelScope.launch { trip.repository.state.collect { if (it.loaded) journeyGame?.reconcileStorage() } } }
@@ -92,6 +96,7 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
         progress?.let { engine -> viewModelScope.launch { engine.refresh() } }
     }
     private fun refreshLocalExperience() {
+        petTravel?.let { pet -> viewModelScope.launch { pet.refresh() } }
         val clock=binding.clock ?: return
         val store=trips?.repository?.state?.value ?: return
         val visit = mutableJourney.value
@@ -109,6 +114,7 @@ class RoadmateViewModel(factory: (CoroutineScope) -> RuntimeBinding) : ViewModel
     }
     fun closeRecall() { openedMemoryId=null; refreshLocalExperience() }
     fun comfortAction(action:suspend (io.booup.roadmate.local.ComfortCoordinator)->Unit)=viewModelScope.launch { comfort?.let { action(it) } }
+    fun petAction(action:suspend (io.booup.roadmate.pet.PetTravelCoordinator)->Unit)=viewModelScope.launch { petTravel?.let { action(it) } }
     fun foreground() = viewModelScope.launch {
         visible = true
         binding.repository.foreground()

@@ -28,6 +28,7 @@ internal fun RoadmateHomeStage(
     openMap: () -> Unit, openRoster: () -> Unit, openWardrobe: (() -> Unit)?, endTrial: (() -> Unit)?,
     openMemory: () -> Unit, openSettings: () -> Unit, openSeason: () -> Unit,
     vehicleStatus: String, historyEnabled: Boolean, availableRewards: Int,
+    petName: String?, openPet: (() -> Unit)?,
     navigation: @Composable () -> Unit, priorityCare: @Composable () -> Unit,
     vehicleDetails: @Composable ColumnScope.() -> Unit,
 ) {
@@ -90,6 +91,7 @@ internal fun RoadmateHomeStage(
                     GamePill(vehicleStatus)
                     GameButton(if (historyEnabled) "기록 저장 켜짐" else "기록 저장 꺼짐", openSettings)
                     GameButton("차량 상태", { showVehicle = true })
+                    openPet?.let { open -> GameButton(petName?.let { "$it 와 함께" } ?: "반려동물 동행",open,primary=petName!=null) }
                 }
                 priorityCare()
             }

@@ -13,7 +13,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal fun localJourneyGame(context: Context, progress: ProgressCoordinator, post: PostDriveCoordinator,
-    clock: ContextClock): JourneyGame {
+    clock: ContextClock, starterCompanions: Set<CompanionId> = emptySet()): JourneyGame {
     val prefs = context.getSharedPreferences("roadmate-collab-game", Context.MODE_PRIVATE)
     val store = EncryptedJourneyGameStore(java.io.File(context.noBackupFilesDir, "roadmate-demo"),
         io.booup.roadmate.storage.AesGcmEnvelope(
@@ -44,7 +44,7 @@ internal fun localJourneyGame(context: Context, progress: ProgressCoordinator, p
                     false
                 }
             }
-        })
+        }, starterCompanions = starterCompanions)
 }
 
 internal fun encodeJourneyGame(state: JourneyGameState) = JSONObject().apply {

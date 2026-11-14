@@ -103,7 +103,7 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 listOf(PassPage.LOBBY, PassPage.STAMPS, PassPage.DRAW, PassPage.LIBRARY).forEach { target ->
-                    TextButton(onClick = { show(target) }, modifier = Modifier.heightIn(min = 48.dp),
+                    TextButton(onClick = { RoadmateSounds.play(RoadmateSound.TAP); show(target) }, modifier = Modifier.heightIn(min = 48.dp),
                         colors = ButtonDefaults.textButtonColors(
                             containerColor = if (page == target) world.paper else world.deep.copy(alpha = .60f),
                             contentColor = if (page == target) world.deep else Color.White),
@@ -163,7 +163,7 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
                                     WorldTitle("패스 선택권 1장", world.deep)
                                     game.candidates(data).forEach { item ->
                                         WorldAction("${item.title} 선택", world, {
-                                            viewModel.journeyAction { if (choose(item)) show(PassPage.DETAIL, item) }
+                                            viewModel.journeyAction { if (choose(item).cue(RoadmateSound.UPGRADE)) show(PassPage.DETAIL, item) }
                                         })
                                     }
                                     if (game.candidates(data).isEmpty()) Text("모든 시즌 패스권을 모았어요.")
@@ -177,12 +177,12 @@ internal fun JourneyPassContent(viewModel: RoadmateViewModel, game: JourneyGame,
                                         drawing = true
                                         drawFailed = false
                                         viewModel.journeyAction {
-                                            drawResult = draw()
+                                            drawResult = draw().also { if (it != null) RoadmateSounds.play(RoadmateSound.POSTCARD) }
                                             drawFailed = drawResult == null
                                             opened = false
                                             drawing = false
                                         }
-                                    }, reveal = { opened = true }, openPass = { received ->
+                                    }, reveal = { RoadmateSounds.play(RoadmateSound.UPGRADE); opened = true }, openPass = { received ->
                                         drawResult = null
                                         show(PassPage.DETAIL, received)
                                     }, openAlbum = openAlbum, openLibrary = {
@@ -222,6 +222,7 @@ private fun SeasonGallery(season: SeasonView, data: JourneyGameState, wide: Bool
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(.28f to Color.Transparent,
                 1f to world.deep.copy(alpha = .96f))))
             Column(Modifier.align(Alignment.BottomStart).padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (pass == JourneyPass.TRAVEL) WorldEyebrow("콜라보 예시  ·  실제 제휴 아님", Color.White)
                 if (data.grants.any { it.pass == pass }) WorldEyebrow("업그레이드 완료", world.gold)
                 Text(pass.title, color = Color.White, style = RoadmateType.cardTitle)
                 Text("패스 보기  ›", color = world.gold, style = RoadmateType.control)
@@ -231,6 +232,17 @@ private fun SeasonGallery(season: SeasonView, data: JourneyGameState, wide: Bool
     if (wide) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         passes.forEach { poster(it, Modifier.weight(if (it == JourneyPass.TRAVEL) 1.5f else 1f)) }
     } else passes.forEach { poster(it, Modifier.fillMaxWidth()) }
+    // Teasers ride with the internal collab build only; the public build keeps original passes alone.
+    if (JourneyPass.TRAVEL in passes) {
+        var preview by remember { mutableStateOf<UpcomingCollab?>(null) }
+        WorldEyebrow("NEXT COLLAB  ·  다음 콜라보 패스", Color.White)
+        if (wide) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            UpcomingCollab.entries.forEach {
+                LockedCollabPoster(it, Modifier.weight(if (it == UpcomingCollab.SHINCHAN) 1.5f else 1f).height(176.dp)) { preview = it }
+            }
+        } else UpcomingCollab.entries.forEach { LockedCollabPoster(it, Modifier.fillMaxWidth().height(160.dp)) { preview = it } }
+        preview?.let { UpcomingPassPreview(it) { preview = null } }
+    }
 }
 
 @Composable
@@ -288,7 +300,7 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
         upgradeFailed = false
         viewModel.journeyAction {
             try {
-                if (previewUpgrade(pass)) dismissReward() else upgradeFailed = true
+                if (previewUpgrade(pass).cue(RoadmateSound.UPGRADE)) dismissReward() else upgradeFailed = true
             } finally { upgrading = false }
         }
     }
@@ -338,7 +350,7 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
                     }, color = world.deep, fontSize = 14.sp)
                     if (eligible || (pack && claimed)) WorldAction(if (pack) "동반자 팩 열기" else "보상 받기", world, {
                         if (pack) { dismissReward(); finalPack = true }
-                        else viewModel.journeyAction { game.claim(pass, tier, isPremium) }
+                        else viewModel.journeyAction { game.claim(pass, tier, isPremium).cue(RoadmateSound.REWARD) }
                     })
                     if (canUpgrade && isPremium && !claimed) {
                         if (upgradeFailed) Text("업그레이드를 저장하지 못했어요. 다시 시도해 주세요.", color = world.deep)
@@ -357,7 +369,7 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
                     choices.forEach { mascot ->
                         WorldAction(if (claimed) "${mascot.profile.displayName} 동행으로 지정" else "${mascot.profile.displayName} 받기", world, {
                             if (claimed) viewModel.equipJourneyCompanion(mascot.profile.id, openHome)
-                            else viewModel.journeyAction { game.claim(pass, 3, true, mascot.profile.id) }
+                            else viewModel.journeyAction { game.claim(pass, 3, true, mascot.profile.id).cue(RoadmateSound.UPGRADE) }
                         })
                     }
                     if (choices.isEmpty()) Text("동반자 미리보기 에셋을 확인해 주세요.")
