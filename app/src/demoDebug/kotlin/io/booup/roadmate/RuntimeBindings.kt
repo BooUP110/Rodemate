@@ -73,7 +73,8 @@ object RuntimeBindings {
         val postController = post?.let { PostDriveDemoController(adapter, requireNotNull(trips), it, requireNotNull(storage), scope) }
         val progress=post?.let { ProgressCoordinator(requireNotNull(storage),RuntimeMode.DEMO,clock,{it.controlsAllowed()},
             initialSeasons = listOf(journeySeason(previews.firstOrNull())),
-            catalog = if (previews.isEmpty() && tourStorage == null) ProgressDemoScenarios.catalog else null, seedOnlyWhenEmpty = true) }
+            catalog = if (previews.isEmpty() && tourStorage == null) ProgressDemoScenarios.catalog else null,
+            seedOnlyWhenEmpty = true, fillDemoSeasonGap = tourStorage == null) }
         val game = when {
             tourStorage != null && progress != null -> JourneyGame(
                 storage = { tourStorage.state.value }, progress = { progress.uiState.value },

@@ -9,16 +9,19 @@ import kotlinx.coroutines.sync.withLock
 
 class ProgressCoordinator(val repository:SeasonRepository,private val mode:RuntimeMode,private val clock:ContextClock,
     private val controlsAllowed:()->Boolean,private val initialSeasons:List<Season> = emptyList(),
-    private val catalog:RegionCatalog?=null, private val seedOnlyWhenEmpty: Boolean = false) {
+    private val catalog:RegionCatalog?=null, private val seedOnlyWhenEmpty: Boolean = false,
+    private val fillDemoSeasonGap: Boolean = false) {
+    init { require(!fillDemoSeasonGap || mode == RuntimeMode.DEMO) }
     private val mutex=Mutex(); private var error:StorageError?=null
     private val mutableUi=MutableStateFlow(ProgressUiState()); val uiState=mutableUi.asStateFlow()
     suspend fun initialize()=mutex.withLock {
         if (!seedOnlyWhenEmpty || repository.state.value.progression.seasons.isEmpty()) {
             capture(repository.installSeasons(initialSeasons))
-        }
+        } else fillCurrentDemoSeasonGap()
         publish()
     }
     suspend fun refresh()=mutex.withLock {
+        fillCurrentDemoSeasonGap()
         val s=repository.state.value
         if(s.loaded && s.error==null && s.progression.seasons.isNotEmpty()) {
             val before=s.progression.ledger.sumOf { it.awardedXp }
@@ -34,6 +37,23 @@ class ProgressCoordinator(val repository:SeasonRepository,private val mode:Runti
     suspend fun previewPremium(seasonId: String, enabled: Boolean) = mutex.withLock {
         if (mode == RuntimeMode.DEMO && controlsAllowed()) capture(repository.setSimulatedPremium(seasonId, enabled))
         publish()
+    }
+    /** Append a missing Demo season within the current gap; never rewrite saved seasons or rewards. */
+    private suspend fun fillCurrentDemoSeasonGap() {
+        if (!fillDemoSeasonGap) return
+        val state = repository.state.value
+        if (!state.loaded || state.error != null) return
+        val saved = state.progression.seasons
+        val now = clock.now().epochMillis
+        if (saved.any { now in it.startsAtEpochMillis until it.endsAtEpochMillis }) return
+        val candidate = initialSeasons.singleOrNull {
+            now in it.startsAtEpochMillis until it.endsAtEpochMillis && saved.none { old -> old.seasonId == it.seasonId }
+        } ?: return
+        val start = maxOf(candidate.startsAtEpochMillis,
+            saved.filter { it.endsAtEpochMillis <= now }.maxOfOrNull { it.endsAtEpochMillis } ?: 0L)
+        val end = minOf(candidate.endsAtEpochMillis,
+            saved.filter { it.startsAtEpochMillis > now }.minOfOrNull { it.startsAtEpochMillis } ?: Long.MAX_VALUE)
+        capture(repository.installSeasons(listOf(candidate.copy(startsAtEpochMillis = start, endsAtEpochMillis = end))))
     }
     private fun capture(result:StorageResult<Unit>):Boolean { error=(result as? StorageResult.Failure)?.error; return error==null }
     private fun publish(awarded:Long=0) {

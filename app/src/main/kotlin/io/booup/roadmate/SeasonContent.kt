@@ -44,7 +44,8 @@ private enum class SeasonTab(val label: String) { REWARDS("보상"), MISSIONS("�
 
 @Composable
 fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = null, openStory: (() -> Unit)? = null,
-    insets: PaddingValues = PaddingValues(0.dp), openHome: () -> Unit = {}, priorityCare: @Composable () -> Unit = {}) {
+    insets: PaddingValues = PaddingValues(0.dp), openHome: () -> Unit = {}, priorityCare: @Composable () -> Unit = {},
+    openDemoTour: (() -> Unit)? = null) {
     val ui by viewModel.progressUiState.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(SeasonTab.REWARDS) }
     var selected by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -100,7 +101,7 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
                         if (!ui.contentAllowed) Text("시즌 기록을 불러오는 중", color = GamePaper)
                         else when (tab) {
                             SeasonTab.REWARDS -> if (active == null) {
-                                Text("현재 진행 중인 시즌이 없어요.", color = GamePaper)
+                                SeasonEmptyState(ui.archived.size, { tab = SeasonTab.ARCHIVE }, openHome, openDemoTour)
                             } else {
                                 val paid = active.rewards.filter { it.reward.track == RewardTrack.PREMIUM }
                                 val featured = paid.lastOrNull { it.reward.level <= active.progress.currentLevel }
@@ -163,6 +164,21 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
             dismiss = { selected = null }) {
             viewModel.progressAction { it.claim(seasonId, rewardId) }
         }
+    }
+}
+
+@Composable
+private fun SeasonEmptyState(archivedCount: Int, openArchive: () -> Unit, openHome: () -> Unit,
+    openDemoTour: (() -> Unit)?) {
+    RoadmateCard {
+        Text("현재 진행 중인 시즌이 없어요", style = RoadmateType.cardTitle)
+        Text("저장된 XP와 수령한 보상은 그대로 보관돼요.", style = RoadmateType.control)
+        if (archivedCount > 0) GameButton("지난 시즌 ${archivedCount}개 보기", openArchive, primary = true)
+        if (openDemoTour != null) {
+            Text("시연용 샘플로 보상 화면을 둘러볼 수 있어요. 기존 기록은 바뀌지 않아요.", style = RoadmateType.control)
+            GameButton("샘플 시즌 둘러보기", openDemoTour)
+        }
+        GameButton("동행으로 돌아가기", openHome)
     }
 }
 

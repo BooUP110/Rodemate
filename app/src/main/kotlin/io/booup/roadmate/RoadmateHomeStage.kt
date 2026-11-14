@@ -21,10 +21,13 @@ import androidx.compose.ui.zIndex
 import io.booup.roadmate.model.CompanionProfile
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 internal fun RoadmateHomeStage(
     insets: PaddingValues, profile: CompanionProfile, preview: CompanionPreview?,
     status: String, drivingState: String, postcards: Int, xp: Long?, openStory: (() -> Unit)?,
     openMap: () -> Unit, openRoster: () -> Unit, openWardrobe: (() -> Unit)?, endTrial: (() -> Unit)?,
+    openMemory: () -> Unit, openSettings: () -> Unit, openSeason: () -> Unit,
+    vehicleStatus: String, historyEnabled: Boolean, availableRewards: Int,
     navigation: @Composable () -> Unit, priorityCare: @Composable () -> Unit,
     vehicleDetails: @Composable ColumnScope.() -> Unit,
 ) {
@@ -48,20 +51,23 @@ internal fun RoadmateHomeStage(
             else CompanionPreviewPortrait(preview, actor, roam = true, onOpenRoster = openRoster)
 
             Column(Modifier.align(if (wide) BiasAlignment(-1f, .14f) else Alignment.BottomStart)
-                .padding(start = titleInset, end = margin, bottom = if (wide) 56.dp else 102.dp),
+                .padding(start = titleInset, end = margin, bottom = if (wide) 72.dp else 106.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.app_name), color = GamePaper, style = RoadmateType.heading.copy(
                     fontSize = if (wide) 70.sp else 40.sp, lineHeight = if (wide) 78.sp else 48.sp))
                 Text(profile.displayName, color = GameGold,
                     style = RoadmateType.cardTitle.copy(fontSize = if (wide) 28.sp else 22.sp, lineHeight = 34.sp))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (openStory != null) GameButton("강릉 이야기", openStory, primary = true)
                     GameButton("탐험 시작", openMap, primary = openStory == null)
+                    GameButton("드라이브 기억", openMemory)
+                    if (availableRewards > 0) GameButton("받을 보상 ${availableRewards}개", openSeason)
                 }
             }
 
-            Row(Modifier.align(if (wide) BiasAlignment(.92f, .66f) else BiasAlignment(1f, .02f))
-                .padding(horizontal = margin), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.align(if (wide) BiasAlignment(.92f, .66f) else BiasAlignment(1f, -.04f))
+                .padding(horizontal = margin), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (endTrial != null) GameButton("체험 끝내기", endTrial)
                 GameButton("동행 바꾸기", openRoster)
                 if (openWardrobe != null) GameButton("옷장", openWardrobe)
@@ -73,12 +79,16 @@ internal fun RoadmateHomeStage(
 
             Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = margin, vertical = 12.dp)
                 .zIndex(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(if (wide) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     GamePill(status)
-                    if (wide) Spacer(Modifier.weight(1f))
                     GamePill("엽서 $postcards")
                     if (xp != null) GamePill("$xp XP")
+                }
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GamePill(vehicleStatus)
+                    GameButton(if (historyEnabled) "기록 저장 켜짐" else "기록 저장 꺼짐", openSettings)
                     GameButton("차량 상태", { showVehicle = true })
                 }
                 priorityCare()

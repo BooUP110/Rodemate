@@ -62,6 +62,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     var homeTrial by remember { mutableStateOf<CompanionPreview?>(null) }
     var rosterOpen by rememberSaveable { mutableStateOf(false) }
     var wardrobeOpen by rememberSaveable { mutableStateOf(false) }
+    var moreOpen by rememberSaveable { mutableStateOf(false) }
     var returnToMap by remember { mutableStateOf(false) }
     var mapPlace by remember { mutableStateOf<JourneyPlace?>(null) }
     var expedition by remember { mutableStateOf(if (tourStop == TourStop.MAP) Expedition.GANGNEUNG else Expedition.SEOUL) }
@@ -112,10 +113,13 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     }
     val navigation: @Composable () -> Unit = {
         if (tourStop == null) RoadmateDock {
-            RoadmatePage.entries.filter { it != RoadmatePage.DEMO || demoControls != null }.forEach { target ->
-                RoadmateDockItem(target.label, target.symbol, selected = page == target,
+            listOf(RoadmatePage.HOME to "동행", RoadmatePage.MAP to "지도",
+                RoadmatePage.COLLECTION to "엽서", RoadmatePage.SEASON to "시즌").forEach { (target, label) ->
+                RoadmateDockItem(label, target.symbol, selected = page == target,
                     enabled = canBrowse || target in setOf(RoadmatePage.HOME, RoadmatePage.DEMO)) { navigate(target) }
             }
+            RoadmateDockItem("더보기", "☰", selected = page in setOf(RoadmatePage.MEMORY, RoadmatePage.SETTINGS, RoadmatePage.DEMO),
+                enabled = canBrowse || (full && demoControls != null)) { moreOpen = true }
         }
     }
     val priorityCare: @Composable () -> Unit = {
@@ -135,6 +139,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
         if (!canBrowse) {
             rosterOpen = false
             wardrobeOpen = false
+            moreOpen = false
         }
     }
     LaunchedEffect(journey.running, canBrowse, returnToMap) {
@@ -152,11 +157,23 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
         }
     }
     BackHandler(storyOpen && canBrowse && !storyVisit && !storyAction) { storyOpen = false }
+    BackHandler(!storyOpen && !rosterOpen && !wardrobeOpen && !moreOpen && page != RoadmatePage.HOME && tourStop == null) {
+        navigate(RoadmatePage.HOME)
+    }
     RoadmateTheme {
+        if (moreOpen && full) AlertDialog(onDismissRequest = { moreOpen = false },
+            title = { Text("더보기") }, text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(RoadmatePage.MEMORY, RoadmatePage.SETTINGS, RoadmatePage.DEMO)
+                        .filter { it != RoadmatePage.DEMO || demoControls != null }.forEach { target ->
+                            GameButton(target.label, { moreOpen = false; navigate(target) },
+                                Modifier.fillMaxWidth(), enabled = canBrowse || target == RoadmatePage.DEMO)
+                        }
+                }
+            }, confirmButton = { GameButton("닫기", { moreOpen = false }) })
         if (touring && screenTour != null) {
             screenTour(canStartTour) {
                 touring = false
-                page = RoadmatePage.DEMO
             }
             if (canStartTour) return@RoadmateTheme
         }
@@ -226,6 +243,15 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                     progress.active?.progress?.totalXp, openStory.takeIf { canPlayStory && !journey.running },
                     openMap = { showMap(journey.place.takeIf { journey.saved }) },
                     openRoster = { rosterOpen = true },
+                    openMemory = {
+                        trip.runtime.completed?.let { record -> viewModel.postDriveAction { it.open(record.tripId) } }
+                        navigate(RoadmatePage.MEMORY)
+                    },
+                    openSettings = { navigate(RoadmatePage.SETTINGS) },
+                    openSeason = { navigate(RoadmatePage.SEASON) },
+                    vehicleStatus = "정차 · ${UiCopy.connection(context.connection.status)}",
+                    historyEnabled = post.historyEnabled,
+                    availableRewards = progress.active?.rewards?.count { it.state == RewardClaimState.AVAILABLE } ?: 0,
                     openWardrobe = if (gameState != null && trial == null) { { wardrobeOpen = true } } else null,
                     endTrial = if (trial == null) null else { { homeTrial = null } },
                     navigation = navigation, priorityCare = priorityCare) {
@@ -257,7 +283,8 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
             }
             if (page == RoadmatePage.SEASON && canBrowse) {
                 SeasonContent(viewModel, activePreview ?: previews.firstOrNull(),
-                    openStory.takeIf { canPlayStory && !journey.running }, insets, { navigate(RoadmatePage.HOME) }, priorityCare)
+                    openStory.takeIf { canPlayStory && !journey.running }, insets, { navigate(RoadmatePage.HOME) }, priorityCare,
+                    openDemoTour = if (canStartTour) { { touring = true } } else null)
                 return@Scaffold
             }
             if (canBrowse) {

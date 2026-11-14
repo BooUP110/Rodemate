@@ -209,26 +209,27 @@ internal fun RoadmateMasthead(status: String, decorated: Boolean) {
 @Composable
 internal fun RoadmateDock(content: @Composable RowScope.() -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Surface(shape = RoundedCornerShape(13.dp), color = GameInk.copy(alpha = .92f),
+        Surface(modifier = Modifier.widthIn(max = 960.dp).fillMaxWidth(),
+            shape = RoundedCornerShape(13.dp), color = GameInk.copy(alpha = .92f),
             border = BorderStroke(1.dp, GameGold.copy(alpha = .42f)), shadowElevation = 7.dp) {
-            Row(Modifier.horizontalScroll(rememberScrollState()).padding(5.dp),
+            Row(Modifier.fillMaxWidth().padding(5.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp), content = content)
         }
     }
 }
 
 @Composable
-internal fun RoadmateDockItem(title: String, symbol: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+internal fun RowScope.RoadmateDockItem(title: String, symbol: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val tone = when {
         !enabled -> GameMist.copy(alpha = .52f)
         selected -> GameInk
         else -> GamePaper
     }
-    Row(Modifier.clip(RoundedCornerShape(8.dp))
+    Column(Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
         .background(if (selected) GameGold else Color.Transparent)
         .selectable(selected, enabled = enabled, role = Role.Tab, onClick = onClick)
-        .heightIn(min = 52.dp).padding(horizontal = 13.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        .heightIn(min = 64.dp).padding(horizontal = 4.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text(symbol, Modifier.clearAndSetSemantics {}, color = if (selected) GameInk else GameGold.copy(alpha = .8f),
             style = MaterialTheme.typography.labelLarge)
         Text(title, color = tone, style = RoadmateType.control.copy(
