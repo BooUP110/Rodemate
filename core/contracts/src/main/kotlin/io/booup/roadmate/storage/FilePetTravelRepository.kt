@@ -74,5 +74,6 @@ class FilePetTravelRepository(private val directory:File, mode:RuntimeMode,
         plan=data.plan?.let { it.copy(stopChecks=Collections.unmodifiableSet(HashSet(it.stopChecks))) },
         cards=Collections.unmodifiableList(ArrayList(data.cards)),memos=Collections.unmodifiableList(ArrayList(data.memos)),
         places=Collections.unmodifiableList(ArrayList(data.places)),claimed=Collections.unmodifiableSet(HashSet(data.claimed)),
+        restSession=data.restSession?.let { it.copy(checks=Collections.unmodifiableSet(HashSet(it.checks))) },
     )
 }

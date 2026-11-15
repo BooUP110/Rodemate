@@ -17,9 +17,37 @@ class PetTravelCoordinator(
     private var actionError:StorageError?=null
     private val mutable=MutableStateFlow(PetTravelUiState())
     val uiState=mutable.asStateFlow()
+    private val restTimer=PetRestTimer()
+    private var restBase:PetRestSession?=null
+    private var lastRestSave=0L
 
-    suspend fun initialize()=mutex.withLock { repository.load(); reconcile(); publish() }
-    suspend fun refresh()=mutex.withLock { if(repository.state.value.loaded) reconcile(); publish() }
+    suspend fun initialize()=mutex.withLock {
+        val loaded=repository.load()
+        actionError=(loaded as? StorageResult.Failure)?.error
+        restBase=repository.state.value.data.restSession
+        restTimer.adopt(restBase,context(),clock.now(),recovery=true)
+        checkpointRest(force=true); reconcile(); publish()
+    }
+    suspend fun refresh()=mutex.withLock {
+        if(repository.state.value.loaded) { reconcile(); checkpointRest() }; publish()
+    }
+    private suspend fun checkpointRest(force:Boolean=false) {
+        if(!repository.state.value.loaded || repository.state.value.error!=null) return
+        val current=repository.state.value.data.restSession
+        val now=clock.now()
+        if(current!=restBase) { restBase=current; restTimer.adopt(current,context(),now,recovery=true) }
+        val available=context().mode==mode && trips().storage.loaded && trips().storage.error==null
+        restTimer.tick(if(available) context() else context().copy(foreground=false),now)
+        val next=restTimer.value
+        val transition=next?.paused!=current?.paused || next?.due!=current?.due
+        if(next!=current && (force || transition || now.monotonicMillis-lastRestSave>=15_000)) {
+            val result=repository.update { if(it.restSession==current) it.copy(restSession=next) else it }
+            actionError=(result as? StorageResult.Failure)?.error
+            restBase=repository.state.value.data.restSession
+            restTimer.adopt(restBase,context(),now)
+            lastRestSave=now.monotonicMillis
+        }
+    }
     private fun allowed():Boolean {
         val store=trips().storage
         return context().mode==mode && store.loaded && store.error==null && localContentAllowed(context(),clock.now())
@@ -58,6 +86,7 @@ class PetTravelCoordinator(
         }
     }
     private suspend fun edit(requireEnabled:Boolean=true, change:(PetTravelData)->PetTravelData?):Boolean=mutex.withLock {
+        checkpointRest(force=true)
         if(!allowed() || !repository.state.value.loaded || repository.state.value.error!=null) { publish(); return@withLock false }
         var accepted=false
         val result=repository.update { stored ->
@@ -65,16 +94,20 @@ class PetTravelCoordinator(
             else { val next=change(privateProjection(stored)); if(next==null) stored else { accepted=true; next } }
         }
         actionError=(result as? StorageResult.Failure)?.error
+        restBase=repository.state.value.data.restSession
+        restTimer.adopt(restBase,context(),clock.now())
+        lastRestSave=clock.now().monotonicMillis
         publish(); accepted && result is StorageResult.Success
     }
     suspend fun saveProfile(name:String,kind:PetKind,consent:Boolean):Boolean {
         val clean=name.trim()
         if(!consent || clean.isBlank() || clean.length>24 || clean.any(Char::isISOControl)) return false
-        return edit(false) { if(it.plan!=null) null else it.copy(consentGranted=true,profile=PetProfile(clean,kind),enabled=if(it.profile==null) true else it.enabled) }
+        return edit(false) { if(it.plan!=null || it.restSession!=null) null else it.copy(consentGranted=true,profile=PetProfile(clean,kind),enabled=if(it.profile==null) true else it.enabled) }
     }
     suspend fun setEnabled(enabled:Boolean)=edit(false) { data ->
         if(!data.consentGranted || data.profile==null) null
-        else data.copy(enabled=enabled,plan=if(enabled) data.plan else null,packing=if(enabled) data.packing else emptySet())
+        else data.copy(enabled=enabled,plan=if(enabled) data.plan else null,packing=if(enabled) data.packing else emptySet(),
+            restSession=if(enabled) data.restSession else null)
     }
     suspend fun deleteAll()=edit(false) { PetTravelData() }
     suspend fun choosePurpose(purpose:PetTravelPurpose)=edit { if(it.plan==null) it.copy(purpose=purpose) else null }
@@ -115,6 +148,30 @@ class PetTravelCoordinator(
         }
     }
     suspend fun deletePlace(id:String)=edit { it.copy(places=it.places.filterNot { p -> p.id==id }) }
+    suspend fun chooseRestInterval(minutes:Int):Boolean {
+        if(minutes !in 15..240) return false
+        return edit { if(it.restSession==null) it.copy(restIntervalMinutes=minutes) else null }
+    }
+    suspend fun startRestSession(storageConsent:Boolean=false):Boolean {
+        if(!storageConsent) return false
+        return edit { data ->
+            val interval=data.restIntervalMinutes
+            if(data.restSession!=null || interval==null) null else data.copy(restSession=PetRestSession(ids(),clock.now().epochMillis,interval))
+        }
+    }
+    suspend fun pauseRestSession()=edit { data -> data.restSession?.let { data.copy(restSession=it.copy(paused=true)) } }
+    suspend fun resumeRestSession()=edit { data -> data.restSession?.takeIf { !it.resting && it.elapsedTotalMillis<PetRestTimer.MAX_ELAPSED }
+        ?.let { data.copy(restSession=it.copy(paused=false)) } }
+    suspend fun beginPetRest()=edit { data -> data.restSession?.takeIf { !it.resting }
+        ?.let { data.copy(restSession=it.copy(resting=true,paused=true,checks=emptySet())) } }
+    suspend fun toggleRestCheck(item:PetRestCheck)=edit { data -> data.restSession?.takeIf { it.resting }?.let { s ->
+        data.copy(restSession=s.copy(checks=if(item in s.checks) s.checks-item else s.checks+item)) } }
+    suspend fun confirmPetRest()=edit { data -> data.restSession?.takeIf { it.resting && it.checks.isNotEmpty() &&
+        it.confirmedRests<10_000 && it.elapsedTotalMillis<PetRestTimer.MAX_ELAPSED }?.let { s ->
+        data.copy(restSession=s.copy(resting=false,paused=false,elapsedSinceRestMillis=0,confirmedRests=s.confirmedRests+1,checks=emptySet())) } }
+    suspend fun cancelPetRest()=edit { data -> data.restSession?.takeIf { it.resting }?.let {
+        data.copy(restSession=it.copy(resting=false,paused=true,checks=emptySet())) } }
+    suspend fun stopRestSession()=edit { it.copy(restSession=null) }
     suspend fun claim(reward:PetPassReward)=edit { if(reward in earned(it) || reward in it.claimed) it.copy(claimed=it.claimed+reward) else null }
     suspend fun applyFrame(frame:PetCardFrame)=edit { data ->
         if(frame==PetCardFrame.PAPER || (frame==PetCardFrame.PAW && PetPassReward.PAW_FRAME in data.claimed) ||
@@ -128,7 +185,7 @@ class PetTravelCoordinator(
     private fun publish() {
         val stored=repository.state.value; val allow=allowed() && stored.loaded && stored.error==null
         if(!allow) { mutable.value=PetTravelUiState(loaded=stored.loaded,error=stored.error ?: actionError); return }
-        val data=privateProjection(stored.data)
+        val data=privateProjection(stored.data).let { if(it.restSession==restBase) it.copy(restSession=restTimer.value) else it }
         val cards=data.cards.mapNotNull { card -> completed().singleOrNull { it.tripId==card.tripId }?.let { card to it } }
             .sortedByDescending { it.second.startedAtEpochMillis }
         mutable.value=PetTravelUiState(true,true,data,data.plan?.tripId?.let { id -> completed().singleOrNull { it.tripId==id } },

@@ -12,6 +12,7 @@
 | [검증 요약](VALIDATION_SUMMARY.md) | 실제 실행한 검사 결과와 미검증 범위 |
 | [사용자 검수](USER_ACCEPTANCE_GUIDE.md) | Production/Demo 직접 확인 체크리스트 |
 | [선택형 반려동물 동행](PET_TRAVEL_MODE.md) | 추가 모드·펫 패스·장소 수첩·엽서·메모와 삭제 범위 |
+| [반려동물 이동 도우미](PET_MOBILITY_FEATURES.md) | 보호자 휴식 계획 타이머·공식 안내 오프라인 조건 검색·출처·제한 |
 | [시연 동선](SUBMISSION_DEMO_FLOW.md) | 실제 차량 읽기와 합성 시연을 구분하는 진행 순서 |
 | [현재 구현 상태](IMPLEMENTATION_STATUS.md) | 네 회복 영역의 구현/검증/미구현 구분 |
 | [단계와 완료 기준](DEVELOPMENT_PHASES.md) | 보안 선행 Gate와 후속 작업 조건 |

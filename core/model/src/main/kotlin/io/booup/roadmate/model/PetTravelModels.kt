@@ -7,6 +7,17 @@ enum class PetPackingItem { WATER_KIT, WALKING_BAG, CARRIER, COMFORT_ITEM }
 enum class PetStopItem { BELONGINGS, NEXT_SCHEDULE }
 enum class PetPassReward { WELCOME_BADGE, PAW_FRAME, STAR_FRAME }
 enum class PetCardFrame { PAPER, PAW, STAR }
+enum class PetRestCheck { WATER, WALK, BELONGINGS }
+
+/** Owner's plan, not a veterinary recommendation or a continuous-driving measurement. */
+data class PetRestSession(
+    val id: String, val startedAtEpochMillis: Long, val intervalMinutes: Int,
+    val elapsedTotalMillis: Long = 0, val elapsedSinceRestMillis: Long = 0,
+    val confirmedRests: Int = 0, val paused: Boolean = false, val resting: Boolean = false,
+    val checks: Set<PetRestCheck> = emptySet(),
+) {
+    val due: Boolean get() = elapsedSinceRestMillis >= intervalMinutes * 60_000L
+}
 
 data class PetProfile(val name: String, val kind: PetKind)
 data class PetTravelPlan(
@@ -34,6 +45,8 @@ data class PetTravelData(
     val places: List<PetPlaceNote> = emptyList(),
     val claimed: Set<PetPassReward> = emptySet(),
     val frame: PetCardFrame = PetCardFrame.PAPER,
+    val restIntervalMinutes: Int? = null,
+    val restSession: PetRestSession? = null,
 )
 data class PetTravelStorage(val loaded: Boolean = false, val data: PetTravelData = PetTravelData(), val error: StorageError? = null)
 data class PetTravelUiState(

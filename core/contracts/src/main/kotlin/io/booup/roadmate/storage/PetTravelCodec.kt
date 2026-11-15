@@ -8,7 +8,7 @@ internal class PetTravelCodec(private val mode: RuntimeMode) {
     fun encode(data: PetTravelData): ByteArray {
         validate(data)
         return ByteArrayOutputStream().also { bytes -> DataOutputStream(bytes).use { out ->
-            out.writeUTF("Roadmate-pet"); out.writeInt(1); out.writeUTF(mode.name)
+            out.writeUTF("Roadmate-pet"); out.writeInt(2); out.writeUTF(mode.name)
             out.writeBoolean(data.consentGranted); out.writeBoolean(data.enabled)
             out.writeBoolean(data.profile != null)
             data.profile?.let { out.writeUTF(it.name); out.writeInt(it.kind.ordinal) }
@@ -26,12 +26,20 @@ internal class PetTravelCodec(private val mode: RuntimeMode) {
             out.writeInt(data.places.size)
             data.places.forEach { out.writeUTF(it.id); out.writeUTF(it.title); out.writeUTF(it.note); out.writeBoolean(it.returnWanted) }
             out.enums(data.claimed); out.writeInt(data.frame.ordinal)
+            out.writeInt(data.restIntervalMinutes ?: 0)
+            out.writeBoolean(data.restSession != null)
+            data.restSession?.let { s ->
+                out.writeUTF(s.id); out.writeLong(s.startedAtEpochMillis); out.writeInt(s.intervalMinutes)
+                out.writeLong(s.elapsedTotalMillis); out.writeLong(s.elapsedSinceRestMillis); out.writeInt(s.confirmedRests)
+                out.writeBoolean(s.paused); out.writeBoolean(s.resting); out.enums(s.checks)
+            }
         } }.toByteArray()
     }
     fun decode(bytes: ByteArray): PetTravelData = try {
         DataInputStream(ByteArrayInputStream(bytes)).use { input ->
             verifyStore(input.readUTF() == "Roadmate-pet")
-            verifyStore(input.readInt() == 1, StorageError.INCOMPATIBLE_SCHEMA)
+            val schema=input.readInt()
+            verifyStore(schema in 1..2, StorageError.INCOMPATIBLE_SCHEMA)
             verifyStore(input.readUTF() == mode.name, StorageError.WRONG_ENVIRONMENT)
             val consent=input.readBoolean(); val enabled=input.readBoolean()
             val profile=if(input.readBoolean()) PetProfile(input.readUTF(),input.enum<PetKind>()) else null
@@ -41,7 +49,13 @@ internal class PetTravelCodec(private val mode: RuntimeMode) {
             val cards=List(input.count(200)) { PetTravelCard(input.readUTF(),input.readUTF(),input.enum(),input.readUTF(),input.readLong()) }
             val memos=List(input.count(100)) { PetDepartureMemo(input.readUTF(),input.readUTF(),input.nullable(),input.readBoolean()) }
             val places=List(input.count(100)) { PetPlaceNote(input.readUTF(),input.readUTF(),input.readUTF(),input.readBoolean()) }
-            val result=PetTravelData(consent,enabled,profile,purpose,packing,plan,cards,memos,places,input.enums(),input.enum())
+            val base=PetTravelData(consent,enabled,profile,purpose,packing,plan,cards,memos,places,input.enums(),input.enum())
+            val result=if(schema==1) base else {
+                val interval=input.readInt().let { if(it==0) null else it }
+                val rest=if(input.readBoolean()) PetRestSession(input.readUTF(),input.readLong(),input.readInt(),
+                    input.readLong(),input.readLong(),input.readInt(),input.readBoolean(),input.readBoolean(),input.enums()) else null
+                base.copy(restIntervalMinutes=interval,restSession=rest)
+            }
             verifyStore(input.available()==0); validate(result); result
         }
     } catch (e: StoreException) { throw e }
@@ -65,6 +79,12 @@ internal class PetTravelCodec(private val mode: RuntimeMode) {
         data.places.forEach { text(it.id,200); text(it.title,60); text(it.note,240,true) }
         verifyStore(data.frame!=PetCardFrame.PAW || PetPassReward.PAW_FRAME in data.claimed)
         verifyStore(data.frame!=PetCardFrame.STAR || PetPassReward.STAR_FRAME in data.claimed)
+        verifyStore(data.restIntervalMinutes==null || data.restIntervalMinutes in 15..240)
+        data.restSession?.let { s ->
+            text(s.id,200); verifyStore(data.enabled && s.startedAtEpochMillis>=0 && s.intervalMinutes in 15..240)
+            verifyStore(s.elapsedTotalMillis in 0..604_800_000L && s.elapsedSinceRestMillis in 0..s.elapsedTotalMillis)
+            verifyStore(s.confirmedRests in 0..10_000 && (!s.resting || s.paused) && (s.resting || s.checks.isEmpty()))
+        }
     }
     private fun DataOutputStream.nullable(value:String?) { writeBoolean(value!=null); if(value!=null) writeUTF(value) }
     private fun DataInputStream.nullable()=if(readBoolean()) readUTF() else null

@@ -38,6 +38,8 @@
 
 반려동물 기능은 홈의 **반려동물 동행**에서 등록·동의 후 선택합니다. 일반 모드와 기존 시즌도 유지됩니다. 자세한 사용·삭제·정보 범위는 [반려동물 동행 안내](docs/PET_TRAVEL_MODE.md)를 참조하세요.
 
+**펫 휴식 도우미**에서 보호자가 정한 간격으로 동행 시간을 관리하고, **동반 조건 검색**에서 서울·강릉·제주 8곳의 공식 안내를 오프라인으로 확인할 수 있습니다. 타이머 재개·휴식 완료는 보호자가 직접 확인합니다. [이동 도우미 사용·정보 출처](docs/PET_MOBILITY_FEATURES.md)를 확인하세요.
+
 검증 환경은 JDK21.0.4, Android SDK35/build-tools35.0.1, Gradle Wrapper8.13입니다. 실행 대상은 Pleos Connect2.1.0/API34 AVD이며 minSdk28, compile/targetSdk35입니다.
 
 Windows PowerShell, 프로젝트 루트에서:
@@ -120,6 +122,8 @@ docs/                 실행·설계·범위·검수 문서
 기본 제품은 3개 모듈입니다. SDK 타입을 UI/도메인에서 분리하고, 안전 판단은 캐릭터·무료 보상과 독립적으로 유지합니다. 상세 흐름은 [아키텍처](docs/ARCHITECTURE.md)에 있습니다.
 
 ## 안전과 검증
+
+2026-11-15 이동 도우미 추가: **626개 / 651회 테스트 결과, 실패·오류·skip0**, Demo debug·Production debug·Production release unsigned 빌드 성공, 최종 offline lint 오류0·경고3. [최신 이동 도우미 검증](docs/verification/pet-mobility-artifacts.json)에 실제 AVD 범위와 한계를 구분했습니다. 아래 이전 날짜 수치는 당시 실행 기록입니다.
 
 홈·시즌 개선과 반려동물 동행, 개발자 브랜치의 효과음·콜라보 예시·제출용 release 구성을 합친 최신 검증은 **594개 고유 테스트 / 619회 실행, 실패·오류·skip 0**, 기본 APK 3종 및 제출용 Demo release 빌드 성공, Production offline lint 오류0·경고3이다. 로컬 콜라보 자료의 부재 및 AVD 검증 범위는 [통합 검토](docs/MERGE_CONTEST_POLISH.md)를 따른다. 아래 수치는 이전 실행 기록이다.
 

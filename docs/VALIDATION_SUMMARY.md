@@ -1,5 +1,21 @@
 # 검증 요약
 
+## 2026-11-15 펫 이동 도우미
+
+기존594개 테스트를 보존하고 신규32개를 추가했다. **626개 / 651회 결과**, model30 / contracts443 / Demo117 / Production61, failure/error/skip0. `:core:model:test :core:contracts:build :app:testDemoDebugUnitTest :app:testProductionDebugUnitTest :app:assembleDemoDebug :app:assembleProductionDebug :app:assembleProductionRelease :app:lintProductionDebug`를 실제 실행하여 성공했다. 변경 없는 Gradle `UP-TO-DATE` 작업을 포함한다. 휴식 세션 저장에 별도 명시 동의가 없으면 생성하지 않는 검증을 포함한 최종 일반 빌드는5분6초다.
+
+최종 offline lint Error/Fatal0·Warning3 (`OldTargetApi`, `GradleDependency`, `DataExtractionRules` 각1)이다. 경고를 숨기는 baseline/suppression은 추가하지 않았다. 온라인 lint는 이번에 새로 실행하지 않았다.
+
+휴식 도달·신선도/배경/공백/시계 역행·명시 확인·저장 복원·키 실패·schema1 호환과 검색 미확인/체중 경계/이동장/날짜를 JVM에서 검증했다. 실제 AVD 범위와 미검증 항목, APK 해시는 [이번 검증 JSON](verification/pet-mobility-artifacts.json)을 따른다. [사용 흐름과 공식 정보 출처](PET_MOBILITY_FEATURES.md).
+
+최종 동일 소스의 격리 앱 UID에서 **Demo7개·Production4개 실제 UI 시나리오**를 완료했다. 별도 저장 동의, 타이머 시작/정지/휴식 확인, 실제 검색/조건 불일치/빈 결과, 실제 Keystore 암호화 파일과 프로세스 재시작 복원을 확인했다. Production은 Console Drive/30 입력과 앱 로그의 `motion=MOVING`·`motionSource=SYSTEM`을 함께 확인하고 상세창 제거·Park 복구를 검증했다. 전체15분 만료를 AVD에서 기다리지는 않았으며 만료 로직은 JVM에서 검증했다.
+
+환경은 Pleos2.1.0/API34, 2560×1440/density160이다. 초기 부팅·설치·관찰 도구/Console 연결 실패 후 최종 완료 실행만 집계했다. 최종 AVD는 software renderer를 사용했고2048MB 요청에도 에뮬레이터가4096MB로 올려 적용했다. 저장된 AVD 설정을 변경하거나 데이터 초기화하지 않았다. 부팅 안정성·성능·실차·새 화면의 큰 글꼴/좁은 창·전체 로터리/스크린리더 접근성은 완료로 판정하지 않는다.
+
+최종 일반 Demo·Production debug APK의 서명을 확인하고 기존 앱에 `adb install -r`로 교체 설치했다. 원래 앱 삭제/데이터 초기화는 하지 않았고 이번 실행의 검증용 별도 앱 두 개만 제거했다. 일반 Demo 재실행 화면에서 기존 기록·XP·프로필이 유지된 것을 확인했다. 원문 이름과 입력·스크린샷은 공개 검증 JSON에 포함하지 않는다.
+
+아래 통합/펫 모드/Phase 실행 수치는 각 이전 실행의 기록이다.
+
 최신 통합 검증은 [공모전 시연 보완 통합](MERGE_CONTEST_POLISH.md)과 [검증 JSON](verification/contest-polish-merge.json)을 따른다. main의 반려동물 작업과 개발자 브랜치를 함께 검증했으며, 아래 펫 모드·Phase8.6 단독 실행과 구분한다.
 
 ## 2026-11-14 반려동물 모드 추가 검증

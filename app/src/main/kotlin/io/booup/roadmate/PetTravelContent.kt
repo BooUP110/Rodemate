@@ -41,7 +41,7 @@ internal fun PetPawMark(modifier:Modifier=Modifier,color:Color=GameGold) {
 }
 
 @Composable
-private fun PetGate(viewModel:RoadmateViewModel,content:@Composable (PetTravelUiState)->Unit) {
+internal fun PetGate(viewModel:RoadmateViewModel,content:@Composable (PetTravelUiState)->Unit) {
     val state by viewModel.petTravelUiState.collectAsStateWithLifecycle()
     when {
         state.error!=null -> RoadmateCard {
@@ -55,7 +55,7 @@ private fun PetGate(viewModel:RoadmateViewModel,content:@Composable (PetTravelUi
 }
 
 @Composable
-private fun PetCheck(label:String,checked:Boolean,onToggle:()->Unit) {
+internal fun PetCheck(label:String,checked:Boolean,onToggle:()->Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min=56.dp).clip(RoundedCornerShape(12.dp))
         .toggleable(checked,role=Role.Checkbox,onValueChange={onToggle()}).padding(horizontal=6.dp,vertical=4.dp),
         verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -83,7 +83,7 @@ internal fun PetTravelEntry(viewModel:RoadmateViewModel,title:String,body:String
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun PetTravelHub(viewModel:RoadmateViewModel,openPass:()->Unit,openPlaces:()->Unit,openCards:()->Unit,
-    openMap:()->Unit,openSettings:()->Unit) = PetGate(viewModel) { state ->
+    openMap:()->Unit,openSettings:()->Unit,openRest:()->Unit,openSearch:()->Unit) = PetGate(viewModel) { state ->
     val data=state.data
     val profile=data.profile
     val plan=data.plan
@@ -109,15 +109,25 @@ internal fun PetTravelHub(viewModel:RoadmateViewModel,openPass:()->Unit,openPlac
             }
             FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 GameButton(if(data.enabled) "일반 모드로 전환" else "반려동물 모드 켜기",{
-                    if(data.enabled && plan!=null) confirmation="mode-off"
+                    if(data.enabled && (plan!=null || data.restSession!=null)) confirmation="mode-off"
                     else viewModel.petAction { it.setEnabled(!data.enabled) }
                 },primary=!data.enabled)
-                GameButton("프로필 수정",{editing=true},enabled=plan==null)
+                GameButton("프로필 수정",{editing=true},enabled=plan==null && data.restSession==null)
             }
             if(!data.enabled) Text("등록한 수첩과 엽서는 보관하고, 기존 여행 화면을 이용해요.")
-            if(plan!=null) Text("프로필은 이번 동행을 마무리하거나 준비를 취소한 뒤 수정할 수 있어요.",style=MaterialTheme.typography.bodySmall)
+            if(plan!=null || data.restSession!=null) Text("프로필은 동행 준비와 휴식 타이머를 종료한 뒤 수정할 수 있어요.",style=MaterialTheme.typography.bodySmall)
         }
         if(data.enabled) {
+            RoadmateCard(tinted=true) {
+                Text("우리 아이의 이동 도우미",style=RoadmateType.cardTitle)
+                Text(data.restSession?.let { if(it.due) "쉬기로 한 시간이 되었어요. 정차한 지금 휴식 계획을 확인해 주세요."
+                    else "휴식 계획 ${it.intervalMinutes}분 · 보호자 확인 ${it.confirmedRests}회" }
+                    ?: "휴식 계획을 정하고, 함께 이용할 장소의 동반 조건을 살펴보세요.")
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    GameButton("펫 휴식 도우미",openRest,primary=true)
+                    GameButton("동반 조건 검색",openSearch)
+                }
+            }
             FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 GameButton("첫 차 나들이 패스",openPass,primary=true)
                 GameButton("우리 아이 장소 수첩",openPlaces)
@@ -183,6 +193,7 @@ internal fun PetTravelHub(viewModel:RoadmateViewModel,openPass:()->Unit,openPlac
     confirmation?.let { action -> AlertDialog(onDismissRequest={confirmation=null},title={Text(when(action) {
         "delete"->"펫 데이터를 모두 삭제할까요?"; "mode-off"->"일반 동행으로 전환할까요?"; else->"이번 동행 준비를 취소할까요?"
     })},text={Text(if(action=="delete") "펫 프로필·장소 수첩·메모·펫 엽서·전용 보상을 지워요. 기존 여행·시즌·XP는 유지해요."
+        else if(action=="mode-off") "진행 중인 펫 동행 준비와 휴식 타이머를 종료해요. 기존 드라이브와 저장한 펫 기록은 유지해요."
         else "아직 펫 엽서로 저장하지 않은 준비를 종료해요. 기존 드라이브와 저장한 펫 기록은 유지해요.")},
         confirmButton={GameButton(if(action=="delete") "펫 데이터 삭제" else "확인",{viewModel.petAction {
             val saved=when(action) { "delete"->it.deleteAll(); "mode-off"->it.setEnabled(false); else->it.cancelOuting() }
@@ -203,7 +214,7 @@ private fun PetProfileDialog(viewModel:RoadmateViewModel,profile:PetProfile?,clo
                 FilterChip(kind==value,{kind=value},label={Text(value.label())},modifier=Modifier.heightIn(min=56.dp))
             } }
             Text("화면 속 안내 동반자와 별도로, 실제 함께 타는 아이를 등록해요.")
-            PetCheck("펫 프로필·준비와 장소 메모·직접 저장한 펫 엽서를 이 기기에 보관하는 데 동의해요.",consent) { consent=!consent }
+            PetCheck("펫 프로필·준비·휴식 계획과 확인 기록·장소 메모·직접 저장한 펫 엽서를 이 기기에 보관하는 데 동의해요.",consent) { consent=!consent }
             Text("모드를 꺼도 기록은 유지해요. 펫 데이터 전체 삭제로 언제든 지울 수 있어요.",style=MaterialTheme.typography.bodySmall)
         }
     },confirmButton={GameButton("프로필 저장",{viewModel.petAction { if(it.saveProfile(name,kind,consent)) close() }},

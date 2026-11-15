@@ -32,6 +32,8 @@ private enum class RoadmatePage(val label: String, val symbol: String, val art: 
     PET("반려동물 동행", "♡", "home-parked.png", "우리 아이와 함께"),
     PET_PLACES("우리 아이 장소 수첩", "◇", "map-gangneung.png", artIndex=1),
     PET_CARDS("함께한 펫 엽서", "✉", "drive-memory.png", artIndex=2),
+    PET_REST("펫 휴식 도우미", "♡", "home-parked.png"),
+    PET_SEARCH("동반 조건 검색", "◇", "map-gangneung.png", artIndex=1),
 }
 
 internal enum class TourStop(val label: String) {
@@ -126,7 +128,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                     enabled = canBrowse || target in setOf(RoadmatePage.HOME, RoadmatePage.DEMO)) { navigate(target) }
             }
             RoadmateDockItem("더보기", "☰", selected = page in setOf(RoadmatePage.MEMORY, RoadmatePage.SETTINGS, RoadmatePage.DEMO,
-                RoadmatePage.PET,RoadmatePage.PET_PLACES,RoadmatePage.PET_CARDS),
+                RoadmatePage.PET,RoadmatePage.PET_PLACES,RoadmatePage.PET_CARDS,RoadmatePage.PET_REST,RoadmatePage.PET_SEARCH),
                 enabled = canBrowse || (full && demoControls != null)) { moreOpen = true }
         }
     }
@@ -166,7 +168,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
     }
     BackHandler(storyOpen && canBrowse && !storyVisit && !storyAction) { storyOpen = false }
     BackHandler(!storyOpen && !rosterOpen && !wardrobeOpen && !moreOpen && page != RoadmatePage.HOME && tourStop == null) {
-        navigate(if(page in setOf(RoadmatePage.PET_PLACES,RoadmatePage.PET_CARDS)) RoadmatePage.PET else RoadmatePage.HOME)
+        navigate(if(page in setOf(RoadmatePage.PET_PLACES,RoadmatePage.PET_CARDS,RoadmatePage.PET_REST,RoadmatePage.PET_SEARCH)) RoadmatePage.PET else RoadmatePage.HOME)
     }
     RoadmateTheme {
         if (moreOpen && full) AlertDialog(onDismissRequest = { moreOpen = false },
@@ -262,6 +264,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                     historyEnabled = post.historyEnabled,
                     availableRewards = progress.active?.rewards?.count { it.state == RewardClaimState.AVAILABLE } ?: 0,
                     petName = pet.data.profile?.name.takeIf { petEnabled },
+                    petRestDue = petEnabled && pet.data.restSession?.due==true,
                     openPet = if(viewModel.petTravel!=null) { {navigate(RoadmatePage.PET)} } else null,
                     openWardrobe = if (gameState != null && trial == null) { { wardrobeOpen = true } } else null,
                     endTrial = if (trial == null) null else { { homeTrial = null } },
@@ -339,9 +342,12 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                             }
                             RoadmatePage.PET -> PetTravelHub(viewModel,{navigate(RoadmatePage.SEASON)},
                                 {navigate(RoadmatePage.PET_PLACES)},{navigate(RoadmatePage.PET_CARDS)},
-                                {navigate(RoadmatePage.MAP)},{navigate(RoadmatePage.SETTINGS)})
+                                {navigate(RoadmatePage.MAP)},{navigate(RoadmatePage.SETTINGS)},
+                                {navigate(RoadmatePage.PET_REST)},{navigate(RoadmatePage.PET_SEARCH)})
                             RoadmatePage.PET_PLACES -> PetPlacesContent(viewModel) {navigate(RoadmatePage.PET)}
                             RoadmatePage.PET_CARDS -> PetCardsContent(viewModel) {navigate(RoadmatePage.PET)}
+                            RoadmatePage.PET_REST -> PetRestContent(viewModel,{navigate(RoadmatePage.PET_SEARCH)},{navigate(RoadmatePage.PET)})
+                            RoadmatePage.PET_SEARCH -> PetPlaceSearchContent(viewModel) {navigate(RoadmatePage.PET)}
                             RoadmatePage.SETTINGS -> {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     GameButton("동행 선택", { rosterOpen = true })

@@ -2,6 +2,8 @@
 
 기존 여행·캐릭터·지도·엽서·시즌을 유지한 추가 모드다. 홈의 **반려동물 동행** 또는 더보기에서 진입한다. 기존 배경·색상·카드·버튼과 안내 캐릭터를 그대로 사용하며, 가상 안내 캐릭터와 실제 함께 타는 아이는 구분한다.
 
+2026-11-15에는 **펫 휴식 도우미·공식 안내 오프라인 동반 조건 검색**을 추가했다. 아래 개인 장소 수첩과 별개 기능이다. 최신 범위·출처·타이머 제한은 [반려동물 이동 도우미](PET_MOBILITY_FEATURES.md)를 따른다.
+
 ## 사용 흐름
 
 1. **우리 아이 등록**: 이름과 반려견/반려묘/기타를 선택하고 펫 데이터 로컬 저장에 명시 동의한다. 현재 한 프로필을 지원한다.
@@ -38,7 +40,7 @@
 
 ## 저장·동의·삭제
 
-- 앱 전용 noBackup의 `roadmate-production/pet` 또는 `roadmate-demo/pet` 아래 별도 `pet-travel.v1.bin`을 기존 Keystore/JCA AES256-GCM으로 보호한다. Pet domain schema1은 Trip schema와 독립이다. Production/Demo UID·경로·키 경계를 유지한다. 기존 Trip 파일·schema·XP 원장을 변경하지 않는다.
+- 앱 전용 noBackup의 `roadmate-production/pet` 또는 `roadmate-demo/pet` 아래 별도 `pet-travel.v1.bin`을 기존 Keystore/JCA AES256-GCM으로 보호한다. Pet domain schema는2이며 기존1을 읽는다. 파일 이름·암호화 키·Trip schema와 독립 경계를 유지한다. Production/Demo UID·경로·키 경계를 유지한다. 기존 Trip 파일·schema·XP 원장을 변경하지 않는다.
 - OS file lock 아래 최신 값을 읽고, 암호화 staging fsync → 재인증/도메인 비교 → atomic replace 성공 후 발행한다. 키 누락/변조/IO 오류를 표시하며 자동 초기화하지 않는다.
 - 펫 프로필·준비/장소 메모·명시 저장한 펫 엽서에 별도 로컬 동의를 받는다. 기존 감성 기억을 자동 복사하지 않는다. 엽서 한마디는 해당 드라이브에 연결한 선택 메모다.
 - 원래 드라이브 삭제/기록 동의 철회는 연결된 펫 엽서와 그 엽서에서 만든 메모에 전파한다. 별도로 추가한 준비/장소 메모는 독립 목적이며 펫 데이터 삭제로 지운다.
@@ -51,4 +53,4 @@
 
 Demo: ‘이번 동행 준비 시작’ → ‘지도에서 나들이 시연’ → 기존 방문 시연 → 정차 후 펫 엽서 저장. 기존 **DEMO/SIMULATED** 경계를 따른다. Production은 실제 관측·저장한 완료 드라이브만 사용한다.
 
-실행 결과와 APK 해시는 [검증 JSON](verification/pet-travel-artifacts.json)을 따른다. 사용자 인수는 PENDING이다. 실차·전체 접근성 인증·복수 프로필·사진/웨어러블·공식 장소 데이터·건강/멀미/차량 방치/실내 안전 온도 감지·차량 제어는 이번 범위에 포함하지 않는다.
+기존 펫 모드 실행 결과와 APK 해시는 [2026-11-14 검증 JSON](verification/pet-travel-artifacts.json)을 따른다. 이동 도우미 추가 검증은 별도 문서를 따른다. 사용자 인수는 PENDING이다. 실차·전체 접근성 인증·복수 프로필·사진/웨어러블·실시간 장소 API·건강/멀미/차량 방치/실내 안전 온도 감지·차량 제어는 이번 범위에 포함하지 않는다.

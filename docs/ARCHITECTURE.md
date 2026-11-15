@@ -1,5 +1,7 @@
 # 아키텍처
 
+2026-11-15 추가: `PetTravelCoordinator` 내부 `PetRestTimer`가 기존 motion evidence와 monotonic clock으로 보호자 시작 세션을 계산한다. 기존 Trip/Care/XP 엔진에 입력하거나 제어 의도를 만들지 않는다. UI가 잠겨도 전경의 유효 관측 시간은 누적할 수 있고, 배경/미확인/공백에서는 일시정지한다. 별도 펫 파일 schema2와15초 체크포인트로 복원하며 schema1 읽기를 보존한다. `PetPlaceSearch`와 `PetPublicPlaceCatalog`는 네트워크 없는 별도 읽기 경계로, 공식 사실 스냅샷과 명시 조건 비교만 제공한다. [동작·출처·제한](PET_MOBILITY_FEATURES.md).
+
 SDK/Android 연동, 결정적 로컬 판단, 화면 표현을 분리한다. 기본 제품은 3개 모듈이며 ViewModel의 StateFlow를 Compose가 구독한다.
 
 | 모듈 | 역할 |
