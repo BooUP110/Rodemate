@@ -116,7 +116,7 @@ internal fun PetPlaceSearchContent(viewModel:RoadmateViewModel,openHub:()->Unit)
             Text("공식 안내를 담은 오프라인 검색",style=RoadmateType.cardTitle)
             Text("서울·강릉·제주 8곳 · 정보 확인일 2026-11-15 · 실시간 운영·입장 가능 보장이 아니에요.")
             Text("현재 위치와 경로를 수집하지 않아요. 지역은 직접 선택해 주세요.",style=MaterialTheme.typography.bodySmall)
-            if(vehicle.mode==RuntimeMode.DEMO) Text("장소 안내는 공식 공개 정보이며 Demo 이동 데이터와 별개예요.",style=MaterialTheme.typography.bodySmall)
+            if(vehicle.mode==RuntimeMode.DEMO) Text("장소 안내는 공식 공개 정보이며 모의 이동 데이터와 별개예요.",style=MaterialTheme.typography.bodySmall)
         }
         RoadmateCard {
             FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {

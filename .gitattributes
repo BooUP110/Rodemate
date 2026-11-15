@@ -1,4 +1,6 @@
 * text=auto
+.gitattributes text eol=lf
+.gitignore text eol=lf
 
 gradlew text eol=lf
 gradlew.bat text eol=crlf
@@ -18,3 +20,4 @@ gradlew.bat text eol=crlf
 *.jpg binary
 *.jpeg binary
 *.webp binary
+*.apk binary

@@ -28,7 +28,7 @@ private enum class RoadmatePage(val label: String, val symbol: String, val art: 
     SEASON("시즌 패스", "✦", "map-gangneung.png"),
     MEMORY("드라이브 기억", "↗", "drive-memory.png", artIndex = 2),
     SETTINGS("설정", "⚙", "home-parked.png", "나의 동행 설정"),
-    DEMO("시연 선택", "▷", "home-parked.png", "함께 체험할 이야기"),
+    DEMO("여행 체험", "▷", "home-parked.png", "함께 체험할 이야기"),
     PET("반려동물 동행", "♡", "home-parked.png", "우리 아이와 함께"),
     PET_PLACES("우리 아이 장소 수첩", "◇", "map-gangneung.png", artIndex=1),
     PET_CARDS("함께한 펫 엽서", "✉", "drive-memory.png", artIndex=2),
@@ -104,7 +104,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
         else viewModel.equipDefaultCompanion(id)
     }
     val canStartTour = canBrowse && !journey.running && context.mode == RuntimeMode.DEMO && screenTour != null
-    val modeLabel = if (previews.isNotEmpty()) "콜라보 예시 시연 · 실제 제휴 아님"
+    val modeLabel = if (previews.isNotEmpty()) "콜라보 미리보기 · 모의 데이터 · 실제 제휴 아님"
         else simulationLabel ?: "실제 차량 정보 · 읽기 전용"
     val showMap: (JourneyPlace?) -> Unit = { place ->
         mapPlace = place
@@ -379,7 +379,7 @@ internal fun RoadmateApp(viewModel: RoadmateViewModel, simulationLabel: String? 
                                         style = MaterialTheme.typography.bodyMedium)
                                     if (journey.running) {
                                         val returnTo = if (storyOpen) "이야기를 이어가요" else "지도로 돌아가요"
-                                        Text("${journey.place?.name.orEmpty()} 방문 시연 중 · 정차 후 $returnTo.",
+                                        Text("${journey.place?.name.orEmpty()} 방문 체험 중 · 정차 후 $returnTo.",
                                             style = MaterialTheme.typography.bodyMedium)
                                     } else if (parkSimulation != null) {
                                         OutlinedButton(onClick = parkSimulation, modifier = Modifier.heightIn(min = 56.dp)) {

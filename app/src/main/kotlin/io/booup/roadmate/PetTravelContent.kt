@@ -168,7 +168,7 @@ internal fun PetTravelHub(viewModel:RoadmateViewModel,openPass:()->Unit,openPlac
                         }
                         if(state.completedTrip==null) {
                             Text("새 드라이브를 기다리고 있어요. 이동 후 완료된 기록이 있으면 펫 엽서를 만들 수 있어요.")
-                            if(viewModel.canSimulateVisit) GameButton("지도에서 나들이 시연",openMap,primary=true)
+                            if(viewModel.canSimulateVisit) GameButton("지도에서 나들이 체험",openMap,primary=true)
                         }
                         PetOutingFinish(viewModel,state)
                         TextButton(onClick={confirmation="cancel"},modifier=Modifier.heightIn(min=56.dp)) { Text("이번 동행 준비 취소") }

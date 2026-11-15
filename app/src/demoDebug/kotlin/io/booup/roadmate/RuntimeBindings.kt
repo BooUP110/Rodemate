@@ -144,10 +144,10 @@ private fun DemoScenarioSelector(adapter: DemoVehicleAdapter, input: DemoLaunchI
                 "기억" -> "오늘의 드라이브를 한 장에"
                 else -> "안전한 습관을 꾸미는 시즌"
             }, style = RoadmateType.heading)
-            Text("모든 차량 값·지역·이용 상태는 시연용이에요. 실제 차량을 읽거나 제어하지 않아요.",
+            Text("모의 차량·지역·이용 데이터로 여행을 체험해요. 실제 차량을 읽거나 제어하지 않아요.",
                 style = RoadmateType.control)
-            Text(if (group == "케어") "주행 시연으로 메뉴가 잠기면 ‘시뮬레이션 정차’를 눌러 다음 시연을 선택하세요."
-                else "선택하면 Demo 기록·컬렉션·시즌이 초기화되고 시연용 저장 동의를 사용해요. 실제 사용자 동의가 아니에요.")
+            Text(if (group == "케어") "모의 주행으로 메뉴가 잠기면 ‘시뮬레이션 정차’를 눌러 다른 체험을 선택하세요."
+                else "선택하면 체험 앱의 기록·컬렉션·시즌이 초기화돼요. 저장 동의도 모의 상태이며 실제 사용자 동의가 아니에요.")
             val choices = when (group) {
                 "케어" -> listOf("하향등 P1 안내" to "I1_P1_LIGHT", "공조 제안과 수락" to "I2_HVAC_ACCEPT",
                     "휴식 권장" to "C4_CONTINUOUS_DRIVE", "차량 경고 안내" to "C5_IMMEDIATE_WARNING",
@@ -157,7 +157,7 @@ private fun DemoScenarioSelector(adapter: DemoVehicleAdapter, input: DemoLaunchI
                 "기억" -> listOf("기억 카드" to "P5_1_BASIC_CARD", "선택 회고" to "P5_4_LOCAL_REFLECTION",
                     "첫 지역 엽서" to "P5_7_FIRST_REGION")
                 else -> listOf("첫 드라이브와 시즌" to "S1_FIRST_TRIP", "무료 보상 받기" to "S7_FREE_CLAIM",
-                    "시연용 추가 보상" to "S10_SIMULATED_PREMIUM")
+                    "추가 보상 미리보기" to "S10_SIMULATED_PREMIUM")
             }
             choices.forEach { (title, id) ->
                 GameButton(title, { input.fromUi(id) }, Modifier.fillMaxWidth())

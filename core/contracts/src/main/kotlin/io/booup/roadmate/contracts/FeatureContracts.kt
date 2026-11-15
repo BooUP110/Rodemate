@@ -68,7 +68,7 @@ interface SeasonRepository {
  * Future independent control boundary. The implementation must resolve the registered proposal,
  * validate allowed action, fresh explicit approval, permission, capability and safety conditions,
  * then re-read actual state. CALLBACK_SUCCESS is not VERIFIED. Never expose this to an LLM.
- * No implementation is registered in Phase 0.
+ * No vehicle control implementation is registered.
  */
 interface ControlGateway {
     suspend fun request(proposal: ControlProposal, approval: UserApproval): ControlState

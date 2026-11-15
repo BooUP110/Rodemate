@@ -42,6 +42,12 @@ internal fun SeasonView.opensWithUpgrade(item: RewardView): Boolean {
 
 private enum class SeasonTab(val label: String) { REWARDS("보상"), MISSIONS("미션"), ARCHIVE("지난 시즌") }
 
+// Display copy is separate from the immutable catalog persisted with earned rewards.
+private val Season.displayTitle: String
+    get() = if (seasonId == "roadmate-local-season-1") "카펫과 함께하는 첫 여행" else title
+private val SeasonReward.displayTitle: String
+    get() = if (rewardId == "original-somsom-pack") "별빛 솜솜 동행 팩" else title
+
 @Composable
 fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = null, openStory: (() -> Unit)? = null,
     insets: PaddingValues = PaddingValues(0.dp), openHome: () -> Unit = {}, priorityCare: @Composable () -> Unit = {},
@@ -87,10 +93,10 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
                 if (ui.contentAllowed && active != null && viewModel.canSimulateVisit) {
                     if (upgraded) {
                         GamePill("패스 업그레이드 적용")
-                        GameButton("업그레이드 시연 초기화", {
+                        GameButton("미리보기 끝내기", {
                             viewModel.progressAction { it.previewPremium(active.season.seasonId, false) }
                         })
-                    } else if (upgrade != null) GameButton("패스 업그레이드 시연", upgrade)
+                    } else if (upgrade != null) GameButton("업그레이드 미리보기 · 결제 없음", upgrade)
                 }
             }
             ui.error?.let { Text("시즌 작업을 완료하지 못했어요. 저장 상태와 수령 조건을 확인해 주세요.",
@@ -109,16 +115,16 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
                                 val paid = active.rewards.filter { it.reward.track == RewardTrack.PREMIUM }
                                 val featured = paid.lastOrNull { it.reward.level <= active.progress.currentLevel }
                                     ?: paid.firstOrNull() ?: active.rewards.firstOrNull()
-                                val storyTitle = if (openStory != null) "사라진 달빛 엽서" else active.season.title
+                                val storyTitle = if (openStory != null) "사라진 달빛 엽서" else active.season.displayTitle
                                 if (wide) Row(Modifier.fillMaxWidth().heightIn(min = 176.dp).height(height.coerceAtLeast(176.dp)),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    SeasonStoryTile(storyTitle, active.season.title, openStory, Modifier.weight(2f).fillMaxHeight())
+                                    SeasonStoryTile(storyTitle, active.season.displayTitle, openStory, Modifier.weight(2f).fillMaxHeight())
                                     featured?.let { item ->
                                         SeasonRewardTile(item, viewModel, active.season.levels[item.reward.level - 1],
                                             active.opensWithUpgrade(item), Modifier.weight(1f).fillMaxHeight()) { showReward(active, item) }
                                     }
                                 } else {
-                                    SeasonStoryTile(storyTitle, active.season.title, openStory, Modifier.fillMaxWidth().height(192.dp))
+                                    SeasonStoryTile(storyTitle, active.season.displayTitle, openStory, Modifier.fillMaxWidth().height(192.dp))
                                     featured?.let { item ->
                                         SeasonRewardTile(item, viewModel, active.season.levels[item.reward.level - 1],
                                             active.opensWithUpgrade(item), Modifier.fillMaxWidth().height(165.dp)) { showReward(active, item) }
@@ -139,10 +145,10 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
                             SeasonTab.ARCHIVE -> {
                                 if (ui.archived.isEmpty()) Text("지난 시즌 기록이 없어요.", color = GamePaper)
                                 ui.archived.forEach { archived ->
-                                    Text("${archived.season.title} · Lv.${archived.progress.currentLevel}", color = GamePaper,
+                                    Text("${archived.season.displayTitle} · Lv.${archived.progress.currentLevel}", color = GamePaper,
                                         style = RoadmateType.cardTitle)
                                     archived.rewards.forEach { item ->
-                                        GameButton("${item.reward.title} · ${rewardLabel(item.state)}", { showReward(archived, item) })
+                                        GameButton("${item.reward.displayTitle} · ${rewardLabel(item.state)}", { showReward(archived, item) })
                                     }
                                 }
                             }
@@ -153,7 +159,7 @@ fun SeasonContent(viewModel: RoadmateViewModel, preview: CompanionPreview? = nul
             if (ui.contentAllowed && tab == SeasonTab.REWARDS && active != null) {
                 val rewards = active.rewards.sortedBy { it.reward.level }.map { item ->
                     PassRailReward(active.season.levels[item.reward.level - 1], item.reward.track == RewardTrack.PREMIUM,
-                        item.reward.title, item.reward.itemArt(), item.state, active.opensWithUpgrade(item)) { showReward(active, item) }
+                        item.reward.displayTitle, item.reward.itemArt(), item.state, active.opensWithUpgrade(item)) { showReward(active, item) }
                 }
                 GamePassRail(active, rewards)
             }
@@ -178,7 +184,7 @@ private fun SeasonEmptyState(archivedCount: Int, openArchive: () -> Unit, openHo
         Text("저장된 XP와 수령한 보상은 그대로 보관돼요.", style = RoadmateType.control)
         if (archivedCount > 0) GameButton("지난 시즌 ${archivedCount}개 보기", openArchive, primary = true)
         if (openDemoTour != null) {
-            Text("시연용 샘플로 보상 화면을 둘러볼 수 있어요. 기존 기록은 바뀌지 않아요.", style = RoadmateType.control)
+            Text("체험 데이터로 시즌 보상을 둘러보세요. 기존 기록은 유지돼요.", style = RoadmateType.control)
             GameButton("샘플 시즌 둘러보기", openDemoTour)
         }
         GameButton("동행으로 돌아가기", openHome)
@@ -222,7 +228,7 @@ private fun SeasonRewardTile(item: RewardView, viewModel: RoadmateViewModel, xp:
         RewardItemIllustration(item.reward.itemArt(), Modifier.align(Alignment.TopEnd).padding(12.dp).size(92.dp))
         Column(Modifier.align(Alignment.BottomStart).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${if (premium) "유료 보상" else "무료 보상"} · $xp XP", color = GameGold, style = RoadmateType.caption)
-            Text(item.reward.title, color = GamePaper, style = RoadmateType.cardTitle.copy(fontSize = 20.sp, lineHeight = 25.sp),
+            Text(item.reward.displayTitle, color = GamePaper, style = RoadmateType.cardTitle.copy(fontSize = 20.sp, lineHeight = 25.sp),
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(if (opensWithUpgrade) "잠김 · 업그레이드 시 수령 가능" else rewardLabel(item.state),
                 color = GameMist, style = RoadmateType.caption, maxLines = 2)
@@ -235,7 +241,7 @@ private fun RewardDialog(item: RewardView, preview: CompanionPreview?, viewModel
     xp: Long, opensWithUpgrade: Boolean, upgrade: (() -> Unit)?, dismiss: () -> Unit, claim: () -> Unit) {
     val pack = item.reward.pack
     val packArt = viewModel.companionPreviews.firstOrNull { it.profile.id == pack?.companionProfileId }
-    AlertDialog(onDismissRequest = dismiss, title = { Text(item.reward.title) }, text = {
+    AlertDialog(onDismissRequest = dismiss, title = { Text(item.reward.displayTitle) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             packArt?.let { CompanionPreviewPortrait(it, Modifier.fillMaxWidth().height(142.dp)) }
             if (item.reward.rewardId == "journey-animated" && preview != null) {
@@ -255,6 +261,6 @@ private fun RewardDialog(item: RewardView, preview: CompanionPreview?, viewModel
             dismiss()
             claim()
         }) { Text("받기") }
-        else if (upgrade != null) TextButton(onClick = { dismiss(); upgrade() }) { Text("패스 업그레이드 시연") }
+        else if (upgrade != null) TextButton(onClick = { dismiss(); upgrade() }) { Text("업그레이드 미리보기 · 결제 없음") }
     }, dismissButton = { TextButton(onClick = dismiss) { Text("닫기") } })
 }

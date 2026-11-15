@@ -91,7 +91,7 @@ internal fun ExplorationContent(viewModel: RoadmateViewModel, context: VehicleCo
                     Text(selected.name, style = RoadmateType.heading)
                     if (!reached) Text("첫 방문 보너스 +$EXPEDITION_FIRST_VISIT_XP XP", style = RoadmateType.metric)
                     if (demo && viewModel.canSimulateVisit) {
-                        GameButton(if (reached) "다시 방문 시연" else "방문 시연", { onSimulate(selected) },
+                        GameButton(if (reached) "다시 방문 체험" else "방문 체험", { onSimulate(selected) },
                             Modifier.fillMaxWidth(), primary = true, enabled = !journey.running)
                     } else if (!reached) Text("확인된 방문 기록이 들어오면 다음 별이 열려요.", style = RoadmateType.control)
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -195,7 +195,7 @@ private fun ExpeditionLandmarks(route: Expedition, count: Int, visits: List<Regi
             else Text("✦", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.headlineMedium)
             Column(Modifier.weight(1f)) {
                 Text("여행자의 랜드마크", style = MaterialTheme.typography.titleLarge)
-                Text(if (demo) "${route.label} · 순위와 반응 시연" else "${route.label} · 지역 완주 보상",
+                Text(if (demo) "${route.label} · 순위와 반응 미리보기" else "${route.label} · 지역 완주 보상",
                     style = MaterialTheme.typography.bodySmall)
             }
         }
@@ -204,10 +204,10 @@ private fun ExpeditionLandmarks(route: Expedition, count: Int, visits: List<Regi
                 Text(landmark.name, style = MaterialTheme.typography.titleLarge)
                 Text(journeyPlace(landmark.pointId)?.name.orEmpty(), style = MaterialTheme.typography.bodyMedium)
                 Text("좋아요 ${landmark.likes.size} · 방문자 ${landmark.visitors.size}명 · ${landmark.points} RP")
-                Text("시연 방문자 1명당 5 RP가 쌓여요.", style = MaterialTheme.typography.bodySmall)
+                Text("가상 방문자 1명당 5 RP가 쌓여요.", style = MaterialTheme.typography.bodySmall)
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (1..3).forEach { number ->
-                        FilterChip(visitor == number, { visitor = number }, { Text("시연 방문자 $number") }, modifier = Modifier.heightIn(min = 48.dp))
+                        FilterChip(visitor == number, { visitor = number }, { Text("가상 방문자 $number") }, modifier = Modifier.heightIn(min = 48.dp))
                     }
                 }
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -215,19 +215,19 @@ private fun ExpeditionLandmarks(route: Expedition, count: Int, visits: List<Regi
                         val person = visitor
                         viewModel.journeyAction { demoLandmarkFeedback(landmark.pointId, person, like = false) }
                     },
-                        enabled = visitor !in landmark.visitors, modifier = Modifier.heightIn(min = 52.dp)) { Text("방문 시연") }
+                        enabled = visitor !in landmark.visitors, modifier = Modifier.heightIn(min = 52.dp)) { Text("방문 체험") }
                     OutlinedButton({
                         val person = visitor
                         viewModel.journeyAction { demoLandmarkFeedback(landmark.pointId, person, like = true) }
                     },
                         enabled = visitor in landmark.visitors && visitor !in landmark.likes,
-                        modifier = Modifier.heightIn(min = 52.dp)) { Text("좋아요 시연") }
+                        modifier = Modifier.heightIn(min = 52.dp)) { Text("좋아요 체험") }
                 }
             }
             count < route.places.size -> Text("${route.places.size}개 지점을 모두 방문한 뒤 지역 완주 기록이 열려요.")
             rank != null -> {
-                Text("지역 완주 · 시연 순위 ${rank}위", style = MaterialTheme.typography.titleMedium)
-                Text(if (rank <= 3) "완주 상위 3명에게 생성권 한 장이 열려요." else "이 시연에서는 완주 상위 3명에게 생성권을 줘요.")
+                Text("지역 완주 · 가상 순위 ${rank}위", style = MaterialTheme.typography.titleMedium)
+                Text(if (rank <= 3) "체험 내 완주 상위 3명에게 생성권 한 장이 열려요." else "체험 내 완주 상위 3명에게 생성권을 줘요.")
                 if (rank <= 3) Button({ creating = true; failed = false }, modifier = Modifier.heightIn(min = 54.dp)) {
                     Text("랜드마크 이름 짓기")
                 }

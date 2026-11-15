@@ -52,15 +52,15 @@ SafeProgressEngine은 저장된 사실과 고정 정책으로 원장·레벨·�
 
 선택형 반려동물 동행은 `PetTravelCoordinator`가 기존 VehicleContext/완료 Trip을 읽고, `PetTravelRepository`의 독립 암호화 sidecar에 보호자가 명시한 프로필·메모·펫 엽서·꾸미기 보상을 저장한다. ViewModel/StateFlow를 통해 기존 메뉴에 추가하며, 일반 모드·기존 시즌·XP 원장으로 쓰기를 역류시키지 않는다. 물리 정차와 UX freshness를 사용자 작업 시 다시 확인하고 원본 삭제를 연결 데이터에 전파한다. [상세 계약](PET_TRAVEL_MODE.md).
 
-현재 저장은 Room/외부 DB 없이 앱 전용 noBackupFilesDir 아래 FileTripRepository를 사용한다. Android Keystore + AES256-GCM envelope1로 보호하고 도메인 schema1/2/3 읽기 호환·schema4 쓰기와 실제 golden fixture를 유지한다. schema4의 명시 선호는 암호화 metadata와 별개다. [저장 보안](PHASE8_6_STORAGE_SECURITY.md)과 [migration](PHASE8_6_STORAGE_MIGRATION.md), [삭제·동의 정책](SAFETY_AND_PRIVACY.md)을 따른다.
+현재 저장은 Room/외부 DB 없이 앱 전용 noBackupFilesDir 아래 FileTripRepository를 사용한다. Android Keystore + AES256-GCM envelope1로 보호하고 도메인 schema1/2/3 읽기 호환·schema4 쓰기와 실제 golden fixture를 유지한다. schema4의 명시 선호는 암호화 metadata와 별개다. [저장 보안](LOCAL_STORAGE_SECURITY.md)과 [migration](LOCAL_STORAGE_MIGRATION.md), [삭제·동의 정책](SAFETY_AND_PRIVACY.md)을 따른다.
 
-## Phase8.6의 독립 로컬 기능
+## 온도 선호와 로컬 기억
 
 - Production의 OutsideTemperatureAdapter는 실제 `ENV_OUTSIDE_TEMPERATURE`를 읽어 기존 Reading/DataMetadata→VehicleContext로 전달한다. raw sensor timestamp·수신 시각을 분리하고 권한/지원/오류/최신성을 기존 모델로 평가한다. Demo에 실제 adapter/permission을 포함하지 않는다.
 - StationaryComfortRule은 명시 USER_INPUT 선호·fresh stationary·현재 UX 허용·실제 외기/front-left target을 요구한다. 기존 자동 HvacRule과 독립이며 CareEvent/ControlIntent/XP/driverPresent를 생성하지 않는다. 설정에서 명시 요청한 경우만 일반 수동 조절 안내를 표시한다.
 - MemoryRecallProjector는 동의된 현재 저장 데이터에서 최근 기억 preview와 UTC 월간 사실 요약을 계산한다. 요약 cache를 저장하지 않는다. 원문은 명시 열기 후만 표시하고 현재 데이터/동의/삭제/generation·주행 gate를 다시 검증한다. LLM·새 동의 모델은 없다.
 
-Production과 Demo는 별도 앱 ID·데이터 경로·composition root를 사용한다. 합성 값과 시나리오는 demoDebug에만 두고 Production에 자동 fallback하지 않는다. release Demo는 생성하지 않는다.
+Production과 Demo는 별도 앱 ID·데이터 경로·composition root를 사용한다. 합성 값과 시나리오는 demoDebug에 두고 Production에 자동 fallback하지 않는다. 일반 Demo release는 비활성이고 별도 내부 preview 빌드만 예외다. 배포 APK은 일반 Production release를 공모전 전용 키로 서명한 APK이며 내부 예시 자료를 사용하지 않는다.
 
 현재 차량 제어는 실행하지 않는다. ControlGateway는 사용자 승인·권한·Capability·안전 조건·실제 결과 확인을 독립 검증해야 하는 경계이며 완료된 제어 구현이 아니다. LLM/외부 서비스도 연결하지 않았다.
 

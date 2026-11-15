@@ -1,4 +1,4 @@
-# Phase 8.6 — 저장 형식 전환
+# 로컬 저장 형식 전환
 
 저장 경로/파일 이름은 유지한다. Production은 `noBackupFilesDir/roadmate-production/trips.v1.bin`, Demo는 별도 앱의 `roadmate-demo/trips.v1.bin`이다. `v1` 파일 이름과 현재 도메인 schema/envelope 버전은 서로 다른 개념이다.
 
@@ -15,4 +15,4 @@ plaintext1/2/3을 읽을 때 암호화된 staging을 생성·fsync·재검증하
 
 암호화 키는 UID/기기와 연결되므로 다른 차량/사용자/설치로 파일만 복사하는 것은 지원하는 동기화·백업 방식이 아니다. noBackup/allowBackup=false를 유지한다. Android 데이터 이전 규칙/lint 경고와 최종 개인정보 문안은 별도 검토 항목이다.
 
-기존 사용자 수락용 데이터는 지우지 않았다. AVD의 원래 Production aggregate는 실제로 암호화 전환한 뒤 프로세스 재시작으로 다시 읽었고 기존 진행도 항목을 보존했다. destructive 테스트는 별도 fixture/격리된 acceptance 앱 데이터에서 수행한다. 정확한 결과/제한은 [실행 보고서](PHASE8_6_ENHANCED_LOCAL_PLATFORM_REPORT.md)를 따른다.
+기존 사용자 수락용 데이터는 지우지 않았다. 이전 AVD에서 원래 Production aggregate는 암호화 전환 후 프로세스 재시작으로 읽고 기존 진행도 항목을 보존했다. destructive 테스트는 별도 fixture/격리된 acceptance 앱 데이터에서 수행한다. 배포 준비 작업에서는 사용자 앱 설치/저장/키를 변경하지 않았다. 정확한 실행 범위는 [검증 요약](VALIDATION_SUMMARY.md)을 따른다.

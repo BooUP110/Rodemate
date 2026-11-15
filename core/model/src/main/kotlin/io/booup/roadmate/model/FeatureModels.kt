@@ -49,7 +49,7 @@ data class SeasonProgress(val seasonId:String, val earnedEventIds:Set<String>, v
     val currentLevel:Int=1, val claimedRewards:Set<String> = emptySet(), val premiumEntitled:Boolean=false,
     val updatedAtEpochMillis:Long=0)
 
-// No concrete control action or SDK command is enabled in Phase 0.
+// Vehicle control actions and SDK write commands are not enabled.
 data class ControlProposal(val proposalId: String, val careEventId: String)
 data class UserApproval(
     val proposalId: String,

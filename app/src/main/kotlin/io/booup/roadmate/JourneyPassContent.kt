@@ -317,7 +317,7 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             WorldAction("엽서 도감", world, openAlbum, primary = false)
             WorldAction("동반자 체험", world, openTrial, primary = false)
-            if (canUpgrade) WorldAction("패스 업그레이드 시연", world, ::upgrade, enabled = !upgrading)
+            if (canUpgrade) WorldAction("업그레이드 미리보기 · 결제 없음", world, ::upgrade, enabled = !upgrading)
             if (!premium && !season.archived) WorldAction("패스권 뽑기", world, openDraw, primary = false)
         }
     }
@@ -354,7 +354,7 @@ private fun ColumnScope.PassJourney(viewModel: RoadmateViewModel, game: JourneyG
                     })
                     if (canUpgrade && isPremium && !claimed) {
                         if (upgradeFailed) Text("업그레이드를 저장하지 못했어요. 다시 시도해 주세요.", color = world.deep)
-                        WorldAction("패스 업그레이드 시연", world, ::upgrade, enabled = !upgrading)
+                        WorldAction("업그레이드 미리보기 · 결제 없음", world, ::upgrade, enabled = !upgrading)
                     }
                 }
             }, confirmButton = { WorldAction("닫기", world, dismissReward, primary = false) })
@@ -483,7 +483,7 @@ private fun ColumnScope.CompanionTrial(pass: JourneyPass, viewModel: RoadmateVie
                 WorldAction(item.profile.displayName, world, { preview = item }, primary = item == preview)
             }
         }
-        Text("시연 상황 · 실내가 더워졌어요.", color = world.deep, fontSize = 15.sp)
+        Text("상황 예시 · 실내가 더워졌어요.", color = world.deep, fontSize = 15.sp)
         if (showCare) Text(when (preview?.profile?.id?.value) {
             "preview:usagi" -> "우라! 실내가 더워요. 23°C로 낮춰볼까요?"
             "preview:hachiware" -> "조금 더워졌네요! 23°C는 어때요?"
@@ -510,7 +510,7 @@ private fun PassLibrary(viewModel: RoadmateViewModel, data: JourneyGameState, ar
         if (data.grants.isEmpty()) Text("여행 우체국 또는 미션 보드에서 패스권을 받을 수 있어요.")
         data.grants.forEach { grant ->
             val source = when {
-                grant.upgradePreview -> "업그레이드 시연"
+                grant.upgradePreview -> "업그레이드 미리보기"
                 grant.drawn -> "뽑기"
                 else -> "선택권"
             }

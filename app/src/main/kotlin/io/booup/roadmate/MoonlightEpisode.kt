@@ -186,7 +186,7 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
                 }
                 MoonlightBeat.TRAVEL -> {
                     MoonlightDialogue("이번 목적지", chapter.place.name)
-                    MoonlightButton("도착 시연") { advance(MoonlightBeat.ARRIVAL) }
+                    MoonlightButton("도착 장면 보기") { advance(MoonlightBeat.ARRIVAL) }
                 }
                 MoonlightBeat.ARRIVAL -> {
                     MoonlightDialogue(speaker, chapter.arrival)
@@ -194,7 +194,7 @@ internal fun MoonlightEpisode(chapter: MoonlightChapter, beat: MoonlightBeat, co
                 }
                 MoonlightBeat.MISSION -> {
                     MoonlightDialogue("현장 미션", chapter.mission)
-                    MoonlightButton(if (saving) "위치 인증 시연 중…" else "위치 인증 시연", enabled = !saving) {
+                    MoonlightButton(if (saving) "모의 방문 확인 중…" else "모의 방문 확인", enabled = !saving) {
                         wrongAnswer = false; advance(MoonlightBeat.PUZZLE)
                     }
                 }

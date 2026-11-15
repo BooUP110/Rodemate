@@ -14,6 +14,8 @@
 local.properties
 captures/
 *.apk
+# Only the audited, signed Production submission artifact is a public source-repo deliverable.
+!/apk/BooUP_카펫_release.apk
 *.aab
 *.apks
 *.aar

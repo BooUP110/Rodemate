@@ -11,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
 
 fun interface RegionEvidenceProvider { fun evidence(trip: TripRecord): RegionEvidence? }
 
-/** Uses Phase4 eligibility; never decides when trips start/end. Every action rechecks current policy. */
+/** Uses trip eligibility; never decides when trips start/end. Every action rechecks current policy. */
 class PostDriveCoordinator(private val trips: TripCoordinator, private val collection: CollectionRepository,
     private val mode: RuntimeMode, private val clock: ContextClock, private val context: () -> VehicleContext,
     private val regions: RegionEvidenceProvider = RegionEvidenceProvider { null },

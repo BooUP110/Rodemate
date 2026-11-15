@@ -223,7 +223,7 @@ private fun PreviewDetails(collab: UpcomingCollab, wide: Boolean, close: () -> U
             }
         }
         GameButton("콜라보가 확정되면 열려요", {}, Modifier.fillMaxWidth(), enabled = false)
-        Text("시연용 콜라보 예시이며 실제 제휴가 아닙니다. 출시할 때는 정식 라이선스 계약 후 적용합니다.",
+        Text("콜라보 구성의 미리보기이며 실제 제휴가 아닙니다. 정식 제공에는 라이선스 계약이 필요합니다.",
             color = GameMist, style = RoadmateType.caption)
     }
 }

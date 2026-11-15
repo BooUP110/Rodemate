@@ -1,10 +1,10 @@
-# Phase 8.6 — 로컬 저장 보안
+# 로컬 저장 보안
 
 저장 파일은 Android Keystore 관리 키와 JCA **AES-256-GCM/NoPadding**으로 보호한다. 사용자 PIN·캐릭터·상수 문자열을 키로 쓰지 않으며, APK/설정 파일에 비밀 키를 넣지 않는다. 신규 crypto 라이브러리 의존성은 없다. 사용자 인수와 Market/실차 승인은 별도다.
 
 ## 책임과 형식
 
-wkdal 통합 후 Demo 게임 진행·획득한 팩·동반자 여행 연결 정보도 `EncryptedJourneyGameStore`에서 같은 AES-GCM envelope 형식으로 보호한다. aggregate와 별도 Demo 키 namespace를 사용하며, 암호문 staging·fsync·atomic replace 후 성공으로 처리한다. 기존 평문 SharedPreferences는 암호화 이행 성공 후 제거한다. 읽기/인증/키 실패 시 기존 파일을 보존하고 쓰기를 차단한다.
+Demo 게임 진행·획득한 팩·동반자 여행 연결 정보도 `EncryptedJourneyGameStore`에서 같은 AES-GCM envelope 형식으로 보호한다. aggregate와 별도 Demo 키 namespace를 사용하며, 암호문 staging·fsync·atomic replace 후 성공으로 처리한다. 기존 평문 SharedPreferences는 암호화 이행 성공 후 제거한다. 읽기/인증/키 실패 시 기존 파일을 보존하고 쓰기를 차단한다.
 
 게임의 여행 연결 정보는 회고 원문이나 별도 감정 기억이 아니며, Trip 기록 동의를 요구한다. 원본 Trip 삭제·기록 동의 철회 시 연결 정보를 제거하고, 시즌 진행 초기화 시 게임 진행도 함께 초기화한다. 엽서 자체는 기존 컬렉션 보존 정책을 따른다. Production에는 게임 저장 구현과 콜라보 자료 공급자를 넣지 않는다.
 
@@ -67,7 +67,7 @@ Production/Demo는 앱 UID·저장 경로·키 namespace가 분리된다. 하드
 
 ## 검증과 한계
 
-SEC-01~12 및 추가 migration 실패·잘못된 키·실제 JCA provider 런타임 오류15개 테스트에서 legacy1/2/3, encrypted reopen, 암호문/IV 변조, 키 누락/무효 fixture, staging 실패, 동의/삭제, persisted bytes를 검사한다. 실제 Android Keystore는 Pleos API34 AVD에서 별도 계측한다. 실제 키를 무효화하기 위해 사용자 키를 삭제하지 않는다. 실행별 결과와 범위는 [Phase8.6 보고서](PHASE8_6_ENHANCED_LOCAL_PLATFORM_REPORT.md) 및 [JSON](verification/phase8-6-artifacts.json)을 따른다.
+기존 보안 JVM 테스트에서 legacy1/2/3, encrypted reopen, 암호문/IV 변조, 키 누락/무효 fixture, staging 실패, 동의/삭제, persisted bytes를 검사한다. 실제 Android Keystore의 이전 Pleos API34 AVD 관측과 이번 JVM 회귀를 구분한다. 실제 키를 무효화하기 위해 사용자 키를 삭제하지 않는다. 최신 실행 범위는 [검증 요약](VALIDATION_SUMMARY.md)을 따른다. 원시 로그와 과거 보고서는 로컬 보관소에 보존한다.
 
 AEAD는 파일의 변조를 검출하지만 전체 유효 파일의 과거 버전 replay, root/OS 침해, 앱 프로세스 침해, 플래시의 forensic secure erase까지 해결하지 않는다. legacy migration은 앱 전용 경로의 이전 도메인 형식을 검증하여 가져오는 경로다. 서버 원장/anti-rollback 보장은 추가하지 않았다.
 

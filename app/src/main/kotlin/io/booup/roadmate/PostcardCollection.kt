@@ -161,7 +161,7 @@ fun CollectionContent(viewModel: RoadmateViewModel, preview: CompanionPreview?, 
                         modifier = Modifier.heightIn(min = 52.dp)) { Text(if (starred) "★ 별을 붙였어요" else "☆ 별 스탬프 붙이기") }
                 }
                 if (place != null) TextButton(onClick = { detail = null; openMap(place) }, modifier = Modifier.heightIn(min = 52.dp)) { Text("지도에서 방문지 보기") }
-                if (card.source == RegionEvidenceSource.DEMO) RoadmateBadge("SIMULATED · 시연 엽서", demo = true)
+                if (card.source == RegionEvidenceSource.DEMO) RoadmateBadge("SIMULATED · 모의 여행 엽서", demo = true)
             }
         }, confirmButton = { TextButton(onClick = { detail = null }) { Text("앨범으로") } },
             dismissButton = { TextButton(onClick = { back = !back }) { Text("엽서 뒤집기") } })

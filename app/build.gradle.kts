@@ -19,12 +19,13 @@ if (internalCollabs) {
         into(preview.dir("apk"))
         rename { "roadmate-collab-debug.apk" }
     }
-    // Contest submission file: apk/<team>_<app>_release.apk (git-ignored; upload it to GitHub Releases).
+    // Historical internal preview only. The public Production artifact is signed separately
+    // by tools/package_submission_release.py; an internal Demo must not overwrite it.
     tasks.register<Copy>("packageContestRelease") {
         dependsOn("assembleDemoRelease")
         from(layout.buildDirectory.file("outputs/apk/demo/release/app-demo-release.apk"))
-        into(rootProject.layout.projectDirectory.dir("apk"))
-        rename { "BooUP_카펫_release.apk" }
+        into(preview.dir("apk"))
+        rename { "roadmate-internal-demo-release.apk" }
     }
 }
 

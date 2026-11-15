@@ -73,7 +73,7 @@ internal fun DemoScreenTour(visible: Boolean, close: () -> Unit) {
             RoadmateCard(Modifier.widthIn(max = 460.dp).padding(16.dp)) {
                 Text(if (failed) "둘러보기를 준비하지 못했어요" else "둘러보기를 준비하고 있어요",
                     style = RoadmateType.cardTitle)
-                GameButton("시연 선택으로", close)
+                GameButton("체험 목록으로", close)
             }
         }
         return
@@ -106,7 +106,7 @@ internal fun DemoScreenTour(visible: Boolean, close: () -> Unit) {
         }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             key(stop) {
-                RoadmateApp(viewModel, simulationLabel = "공모전 시연 · SIMULATED",
+                RoadmateApp(viewModel, simulationLabel = "여행 체험 · 모의 데이터 · SIMULATED",
                     parkSimulation = viewModel.parkSimulation, tourStop = stop)
             }
         }
@@ -124,7 +124,7 @@ internal fun DemoScreenTour(visible: Boolean, close: () -> Unit) {
                         }, Modifier.fillMaxWidth(), primary = stop == target)
                     }
                     if (viewModel.companionPreviews.any { it.profile.id in JourneyPass.TRAVEL.companionIds() }) {
-                        GameButton("콜라보 캐릭터 시연", {
+                        GameButton("콜라보 동행 미리보기", {
                             val cast = viewModel.companionPreviews.map { it.profile.id }.filter { it in JourneyPass.TRAVEL.companionIds() }
                             viewModel.journeyAction { prepareCollabTour(cast) }
                             stop = TourStop.HOME
@@ -173,7 +173,7 @@ internal suspend fun prepareTourStorage(storage: FileTripRepository, now: Observ
         return false
     }
     val place = Expedition.GANGNEUNG.places.first()
-    val origin = TripLocation("강릉 시연 출발지", DataSource.SIMULATED)
+    val origin = TripLocation("강릉 모의 출발지", DataSource.SIMULATED)
     val destination = TripLocation(place.name, DataSource.SIMULATED)
     val trip = TripRecord("tour-gangneung", TripState.COMPLETED, start, end, DataSource.SIMULATED,
         duration, duration, distanceMeters = 8_000, startLocation = origin, endLocation = destination,

@@ -42,8 +42,8 @@ fun PostDriveContent(viewModel: RoadmateViewModel, openAlbum: ((JourneyPlace?) -
                     Text("드라이브 기록 시간  " + UiCopy.duration(card.durationMillis), style = MaterialTheme.typography.headlineMedium)
                     Text("종료 " + UiCopy.date(card.endedAtEpochMillis) + " · UTC", style = MaterialTheme.typography.bodyMedium)
                     card.distanceMeters?.let { Text("확인된 거리  " + it + " m") }
-                    card.startLabel?.let { Text("출발  " + if (card.source == DataSource.SIMULATED) "시연 출발지" else it) }
-                    card.endLabel?.let { Text("도착  " + if (card.source == DataSource.SIMULATED) "시연 도착지" else it) }
+                    card.startLabel?.let { Text("출발  " + if (card.source == DataSource.SIMULATED) "모의 출발지" else it) }
+                    card.endLabel?.let { Text("도착  " + if (card.source == DataSource.SIMULATED) "모의 도착지" else it) }
                     Text("달력 기준 " + UiCopy.season(card.calendar.season) + " · " + card.calendar.zoneId, style = MaterialTheme.typography.bodyMedium)
                     if (viewModel.journeyGame != null) {
                         val xp = trip.storage.progression.ledger.filter { it.sourceTripId == card.tripId && it.seasonId == JOURNEY_SEASON_ID }
